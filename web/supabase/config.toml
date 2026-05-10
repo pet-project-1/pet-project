@@ -1,0 +1,37 @@
+# Supabase CLI config — 로컬 개발용 기본값
+# `supabase init` 실행 시 자동 생성되는 형식. 핵심 항목만 명시.
+
+project_id = "pawfeeder"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage"]
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5173"]
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false   # 로컬 개발 편의를 위해 비활성
+
+[realtime]
+enabled = true
+
+[storage]
+enabled = true
+file_size_limit = "5MiB"

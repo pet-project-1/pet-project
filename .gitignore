@@ -1,0 +1,25 @@
+node_modules
+dist
+dist-ssr
+.env
+.env.local
+.env.*.local
+.DS_Store
+*.log
+.vscode/*
+!.vscode/extensions.json
+
+# Supabase
+.branches
+.temp
+supabase/.branches/
+supabase/.temp/
+
+# 졸프 자료 (Vercel/GitHub에 올릴 필요 없음, 내부 자료)
+졸프/
+시스템구조설계_*.pdf
+
+# YOLO 학습 산출물 (대용량)
+YOLOv8/*.onnx
+YOLOv8/*.pt
+YOLOv8/datasets/
