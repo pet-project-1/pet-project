@@ -1,57 +1,70 @@
+import os
+import time
 import cv2
+from picamera2 import Picamera2
 from ultralytics import YOLO
+
+# 검출된 프레임을 디스크에 저장하고 싶을 때 경로 지정 (None이면 저장 안 함)
+SAVE_DIR = "./captures"
+SAVE_EVERY_N_DETECTIONS = 30  # N번째 검출마다 저장 (스팸 방지)
+
+CAPTURE_SIZE = (3280, 2464)
+
 
 def main():
     print("모델 로딩 중...")
-    # YOLO 모델 로드 (ONNX 파일을 로드해도 내부적으로 ONNXRuntime 엔진을 사용하여 빠르게 동작합니다)
     model = YOLO('yolov8n.onnx', task='detect')
-    
-    # 카메라 세팅
-    # Pi Camera 모듈을 사용할 경우 인덱스를 0 또는 -1 등 상황에 맞게 변경해야 할 수 있습니다.
-    cap = cv2.VideoCapture(0)
-    
-    if not cap.isOpened():
-        print("에러: 카메라를 열 수 없습니다.")
-        return
 
-    print("카메라 구동 시작 (종료를 원하면 화면 클릭 후 'q' 키를 누르세요)")
+    if SAVE_DIR:
+        os.makedirs(SAVE_DIR, exist_ok=True)
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            print("에러: 프레임을 읽어올 수 없습니다.")
-            break
+    picam2 = Picamera2()
+    # picamera2 format 'RGB888'은 메모리 레이아웃이 B,G,R 순 → numpy 배열이 OpenCV BGR과 호환
+    config = picam2.create_video_configuration(
+        main={"size": CAPTURE_SIZE, "format": "RGB888"}
+    )
+    picam2.configure(config)
+    picam2.start()
+    time.sleep(0.5)  # 센서 워밍업
 
-        # YOLO 추론 (강아지 검출)
-        # classes=[16] : COCO 데이터셋에서 강아지만 필터링
-        # imgsz=320 : Pi 4b 속도를 위해 해상도를 320으로 제한
-        results = model.predict(source=frame, classes=[16], conf=0.4, imgsz=320, verbose=False, device='cpu')
-        for result in results:
-            boxes = result.boxes
-            for box in boxes:
-                # Bounding Box 좌표 추출 (정수형 변환)
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                
-                # 화면에 초록색 네모 박스 그리기
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                
-                # 텍스트 ('Dog') 배경 및 글씨 쓰기
-                label = "Dog"
-                (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
-                cv2.rectangle(frame, (x1, y1 - 20), (x1 + tw, y1), (0, 255, 0), -1)
-                cv2.putText(frame, label, (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+    print("카메라 구동 시작 (Ctrl+C 로 종료)")
 
-        # 화면 출력
-        cv2.imshow("YOLOv8 Dog Detection (Pi 4b)", frame)
-        
-        # 'q' 키를 누르면 루프 탈출
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+    frame_idx = 0
+    detection_idx = 0
+    try:
+        while True:
+            frame = picam2.capture_array()
+            frame_idx += 1
 
-    # 자원 해제
-    cap.release()
-    cv2.destroyAllWindows()
-    print("프로그램이 종료되었습니다.")
+            results = model.predict(
+                source=frame, classes=[16], conf=0.4,
+                imgsz=320, verbose=False, device='cpu',
+            )
+
+            detections = []
+            for result in results:
+                for box in result.boxes:
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    conf = float(box.conf[0])
+                    detections.append((x1, y1, x2, y2, conf))
+
+            if detections:
+                detection_idx += 1
+                print(f"[frame {frame_idx}] dogs={len(detections)} "
+                      f"{[(d[:4], round(d[4], 2)) for d in detections]}")
+
+                if SAVE_DIR and detection_idx % SAVE_EVERY_N_DETECTIONS == 0:
+                    for x1, y1, x2, y2, _ in detections:
+                        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                    fname = f"{SAVE_DIR}/dog_{int(time.time())}.jpg"
+                    cv2.imwrite(fname, frame)
+                    print(f"  saved: {fname}")
+    except KeyboardInterrupt:
+        print("\n종료 신호 받음.")
+    finally:
+        picam2.stop()
+        print("프로그램이 종료되었습니다.")
+
 
 if __name__ == "__main__":
     main()

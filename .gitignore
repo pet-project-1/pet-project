@@ -20,6 +20,5 @@ supabase/.temp/
 시스템구조설계_*.pdf
 
 # YOLO 학습 산출물 (대용량)
-YOLOv8/*.onnx
 YOLOv8/*.pt
 YOLOv8/datasets/
