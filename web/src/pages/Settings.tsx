@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
-import { devices } from "@/lib/mockData";
+import { useDevicesQuery } from "@/hooks/queries";
 
 export default function Settings() {
+  const { data: devices = [], isLoading: devicesLoading } = useDevicesQuery();
   const [morning, setMorning] = useState("08:00");
   const [evening, setEvening] = useState("18:00");
   const [blockUnregistered, setBlockUnregistered] = useState(true);
@@ -89,20 +91,33 @@ export default function Settings() {
           <span className="h-2 w-2 rounded-full bg-brand-dark" /> 하드웨어 상태
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
-          {devices.map((d) => (
-            <div key={d.id} className="rounded-lg border border-ink-line bg-surface p-4">
-              <div className="text-[11px] text-ink-faint">{d.name}</div>
-              <div className="mt-1 text-[14px] font-bold text-brand">정상 작동 중</div>
-              <div className="mt-1 text-[11px] text-ink-mute">사료 잔량: {d.food_remaining_pct}%</div>
-            </div>
-          ))}
-          <div className="rounded-lg border border-ink-line bg-surface p-4">
-            <div className="text-[11px] text-ink-faint">라즈베리파이</div>
-            <div className="mt-1 text-[14px] font-bold text-brand">온라인</div>
-            <div className="mt-1 text-[11px] text-ink-mute">CPU: 42% · 메모리: 61%</div>
+        {devicesLoading ? (
+          <div className="flex items-center justify-center py-8 text-ink-faint">
+            <Loader2 className="mr-2 animate-spin" size={16} /> 로딩 중…
           </div>
-        </div>
+        ) : devices.length === 0 ? (
+          <div className="py-8 text-center text-[12px] text-ink-mute">
+            등록된 급식기가 없습니다.
+          </div>
+        ) : (
+          <div className="grid grid-cols-3 gap-3">
+            {devices.map((d) => (
+              <div key={d.id} className="rounded-lg border border-ink-line bg-surface p-4">
+                <div className="text-[11px] text-ink-faint">{d.name}</div>
+                <div
+                  className={`mt-1 text-[14px] font-bold ${
+                    d.status === "online" ? "text-brand" : "text-accent-danger"
+                  }`}
+                >
+                  {d.status === "online" ? "정상 작동 중" : "오프라인"}
+                </div>
+                <div className="mt-1 text-[11px] text-ink-mute">
+                  {d.location} · 사료 잔량 {d.food_remaining_pct}%
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );

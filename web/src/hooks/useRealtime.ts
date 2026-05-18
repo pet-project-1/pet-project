@@ -6,11 +6,10 @@
 //   브라우저: TanStack Query 캐시 무효화 → UI 자동 리렌더 (별도 새로고침 불필요)
 //
 // 사용처: <Layout> 안에서 한 번 호출. 인증된 모든 페이지에서 자동 활성화.
-// Supabase 가 비활성(.env 미설정)이면 no-op.
 
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { isSupabaseEnabled, supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 const TABLES = ["feeding_records", "alerts", "dogs", "devices"] as const;
 
@@ -18,10 +17,8 @@ export function useRealtime() {
   const qc = useQueryClient();
 
   useEffect(() => {
-    if (!isSupabaseEnabled || !supabase) return;
-
     const channels = TABLES.map((table) =>
-      supabase!
+      supabase
         .channel(`rt-${table}`)
         .on(
           "postgres_changes",
@@ -34,7 +31,7 @@ export function useRealtime() {
     );
 
     return () => {
-      channels.forEach((ch) => supabase!.removeChannel(ch));
+      channels.forEach((ch) => supabase.removeChannel(ch));
     };
   }, [qc]);
 }

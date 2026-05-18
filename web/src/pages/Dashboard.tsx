@@ -101,17 +101,8 @@ export default function Dashboard() {
             </div>
             <span className="pill bg-brand/15 text-brand">YOLO v8</span>
           </div>
-          <CameraBox
-            label="실시간 영상 피드"
-            height={280}
-            detection={{
-              name: "몰티즈",
-              confidence: 0.942,
-              pos: { left: "12%", top: "30%" },
-            }}
-            blocked={{ pos: { left: "62%", top: "32%" } }}
-            status="급식 진행 중 · 1번 개체"
-          />
+          {/* 카메라 영상/감지 오버레이는 라즈베리파이 + YOLO 스트림 연동 대상 (Sprint 2). */}
+          <CameraBox label="실시간 영상 피드" height={280} status="대기 중" />
         </div>
 
         <div className="card p-5">
