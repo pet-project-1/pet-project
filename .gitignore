@@ -22,3 +22,4 @@ supabase/.temp/
 # YOLO 학습 산출물 (대용량)
 YOLOv8/*.pt
 YOLOv8/datasets/
+.vercel
