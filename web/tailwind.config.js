@@ -4,17 +4,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        // PawFeeder palette (from mockups)
+        // PawFeeder palette — 퍼스널 컬러: 생연두(yeondu)
         sidebar: {
-          DEFAULT: "#1A2233",
-          border: "#2A3A50",
-          hover: "#243448",
+          DEFAULT: "#16261A",   // 딥 포레스트 그린 — 사이드바/카메라 배경
+          border: "#2B4030",
+          hover: "#22351F",
         },
         brand: {
-          DEFAULT: "#1A82E2",
-          hover: "#1568B8",   // button hover (원본 .btn-save:hover)
-          dark: "#0D5DB8",    // gradient endpoint
-          muted: "#5B7D95",
+          DEFAULT: "#9ED12A",   // 생연두 — 채움·강조 (어두운 배경 위 텍스트로도 OK)
+          hover: "#8BBA24",     // 버튼 hover
+          dark: "#5C8214",      // 딥 연두 — 밝은 배경 위 텍스트·아이콘·차트
+          ink: "#1E3A0E",       // 거의 검정에 가까운 녹색 — 연두 버튼 위 글자
+          muted: "#7E9466",     // 뮤트 그린그레이 — 사이드바 보조 텍스트
         },
         ink: {
           DEFAULT: "#1A2233",
@@ -31,7 +32,7 @@ export default {
         accent: {
           warn: "#F4A261",
           danger: "#E76F51",
-          good: "#1A82E2",
+          good: "#9ED12A",
         },
       },
       fontFamily: {

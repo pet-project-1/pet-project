@@ -8,8 +8,8 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, signIn, loading, error } = useAuth();
-  const [email, setEmail] = useState("admin@pawfeeder.test");
-  const [password, setPassword] = useState("shelter1234");
+  const [email, setEmail] = useState("admin@pawfeeder.com");
+  const [password, setPassword] = useState("");
 
   if (user) {
     const dest = (location.state as { from?: { pathname?: string } })?.from?.pathname ?? "/dashboard";
@@ -48,7 +48,7 @@ export default function Login() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@pawfeeder.test"
+                placeholder="admin@pawfeeder.com"
                 required
               />
             </div>
@@ -79,11 +79,9 @@ export default function Login() {
           </button>
 
           <div className="mt-5 flex items-start gap-2 rounded-lg bg-canvas p-3 text-[11px] text-ink-mute">
-            <ShieldCheck size={14} className="mt-[1px] shrink-0 text-brand" />
+            <ShieldCheck size={14} className="mt-[1px] shrink-0 text-brand-dark" />
             <div>
-              데모 계정: <b>admin@pawfeeder.test</b> / <b>shelter1234</b>
-              <br />
-              수의사: <b>vet@pawfeeder.test</b> / <b>vet1234</b>
+              데모 계정: <b>admin@pawfeeder.com</b> / <b>PawFeeder2026!</b>
             </div>
           </div>
         </form>

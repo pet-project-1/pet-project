@@ -99,7 +99,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 text-[14px] font-bold text-ink-body">
               <span className="h-2 w-2 rounded-full bg-brand-dark" /> 실시간 카메라
             </div>
-            <span className="pill bg-brand/15 text-brand">YOLO v8</span>
+            <span className="pill bg-brand/20 text-brand-dark">YOLO v8</span>
           </div>
           {/* 카메라 영상/감지 오버레이는 라즈베리파이 + YOLO 스트림 연동 대상 (Sprint 2). */}
           <CameraBox label="실시간 영상 피드" height={280} status="대기 중" />
@@ -125,7 +125,7 @@ export default function Dashboard() {
                       ? "#E76F51"
                       : a.severity === "warn"
                       ? "#F4A261"
-                      : "#1A82E2"
+                      : "#5C8214"
                   }`,
                 }}
               >
@@ -137,7 +137,7 @@ export default function Dashboard() {
                         ? "#E76F51"
                         : a.severity === "warn"
                         ? "#F4A261"
-                        : "#1A82E2",
+                        : "#5C8214",
                   }}
                 />
                 <div className="min-w-0">
@@ -167,7 +167,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-2 text-[14px] font-bold text-ink-body">
             <span className="h-2 w-2 rounded-full bg-brand-dark" /> 개체별 급식 현황
           </div>
-          <span className="pill bg-brand/15 text-brand">실시간</span>
+          <span className="pill bg-brand/20 text-brand-dark">실시간</span>
         </div>
 
         {dogsLoading ? (
@@ -254,7 +254,7 @@ export default function Dashboard() {
                 <span
                   className={`pill ${
                     dev.status === "online"
-                      ? "bg-brand/15 text-brand"
+                      ? "bg-brand/20 text-brand-dark"
                       : "bg-accent-danger/15 text-accent-danger"
                   }`}
                 >

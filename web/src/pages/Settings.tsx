@@ -106,7 +106,7 @@ export default function Settings() {
                 <div className="text-[11px] text-ink-faint">{d.name}</div>
                 <div
                   className={`mt-1 text-[14px] font-bold ${
-                    d.status === "online" ? "text-brand" : "text-accent-danger"
+                    d.status === "online" ? "text-brand-dark" : "text-accent-danger"
                   }`}
                 >
                   {d.status === "online" ? "정상 작동 중" : "오프라인"}

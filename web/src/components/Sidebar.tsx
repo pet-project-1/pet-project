@@ -74,7 +74,7 @@ export default function Sidebar() {
       <div className="mt-auto border-t border-sidebar-border px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-[12px] font-bold text-[#C8D8E8]">
+            <div className="text-[12px] font-bold text-[#CDE3C0]">
               {user?.display_name ?? "관리자"}
             </div>
             <div className="text-[10px] text-brand-muted">

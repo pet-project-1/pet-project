@@ -42,7 +42,7 @@ export default function Alerts() {
             onClick={() => setFilter(f.key)}
             className={`rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition ${
               filter === f.key
-                ? "border-brand bg-brand/10 text-brand"
+                ? "border-brand-dark bg-brand/15 text-brand-dark"
                 : "border-ink-strong bg-white text-ink-body hover:bg-surface"
             }`}
           >
@@ -77,7 +77,7 @@ function AlertColumn({
   const tone = {
     danger: "bg-accent-danger/15 text-accent-danger",
     warn: "bg-accent-warn/15 text-accent-warn",
-    info: "bg-brand/15 text-brand",
+    info: "bg-brand/20 text-brand-dark",
   }[badgeTone];
 
   return (
@@ -105,7 +105,7 @@ function AlertColumn({
                     ? "#E76F51"
                     : a.severity === "warn"
                     ? "#F4A261"
-                    : "#1A82E2"
+                    : "#5C8214"
                 }`,
               }}
             >
@@ -118,7 +118,7 @@ function AlertColumn({
                         ? "#E76F51"
                         : a.severity === "warn"
                         ? "#F4A261"
-                        : "#1A82E2",
+                        : "#5C8214",
                   }}
                 />
                 <div className="min-w-0 flex-1">

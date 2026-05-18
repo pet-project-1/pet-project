@@ -103,7 +103,7 @@ export default function Dogs() {
           <div className="mb-4 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-[14px] font-bold text-ink-body">
               <span className="h-2 w-2 rounded-full bg-brand-dark" /> 등록 개체 목록
-              <span className="pill ml-1 bg-brand/15 text-brand">{filtered.length}마리</span>
+              <span className="pill ml-1 bg-brand/20 text-brand-dark">{filtered.length}마리</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="relative">
@@ -229,7 +229,7 @@ export default function Dogs() {
 
               <div className="mt-5">
                 <div className="mb-2 flex items-center gap-2 text-[12px] font-bold text-ink-body">
-                  <BarChart3 size={14} className="text-brand" /> 최근 7일 섭취량
+                  <BarChart3 size={14} className="text-brand-dark" /> 최근 7일 섭취량
                 </div>
                 <div className="h-[140px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -240,7 +240,7 @@ export default function Dogs() {
                         contentStyle={{ fontSize: 11, borderRadius: 8 }}
                         formatter={(v: number) => [`${v}g`, "섭취량"]}
                       />
-                      <Bar dataKey="consumed_g" radius={[4, 4, 0, 0]} fill="#1A82E2" />
+                      <Bar dataKey="consumed_g" radius={[4, 4, 0, 0]} fill="#9ED12A" />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

@@ -193,11 +193,11 @@ export default function Vet() {
                     contentStyle={{ fontSize: 11, borderRadius: 8 }}
                     formatter={(v: number) => [`${v}g`, "섭취량"]}
                   />
-                  <ReferenceLine y={dailyG} stroke="#1A82E2" strokeDasharray="4 4" />
+                  <ReferenceLine y={dailyG} stroke="#5C8214" strokeDasharray="4 4" />
                   <Line
                     type="monotone"
                     dataKey="consumed_g"
-                    stroke="#1A82E2"
+                    stroke="#5C8214"
                     strokeWidth={2}
                     dot={false}
                   />
@@ -281,7 +281,7 @@ function Row({
   return (
     <div className="flex items-center justify-between border-b border-ink-softline py-1.5">
       <span className="text-ink-faint">{label}</span>
-      <span className={tone === "brand" ? "font-bold text-brand" : "font-bold text-ink-body"}>
+      <span className={tone === "brand" ? "font-bold text-brand-dark" : "font-bold text-ink-body"}>
         {value}
       </span>
     </div>

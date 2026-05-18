@@ -9,7 +9,7 @@ const labels: Record<FeedingStatus, string> = {
 };
 
 const tone: Record<FeedingStatus, string> = {
-  completed: "bg-brand/15 text-brand",
+  completed: "bg-brand/20 text-brand-dark",
   pending: "bg-accent-warn/15 text-accent-warn",
   incomplete: "bg-accent-warn/15 text-accent-warn",
   blocked: "bg-accent-danger/15 text-accent-danger",

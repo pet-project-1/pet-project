@@ -54,7 +54,7 @@ export default function History() {
             onClick={() => setRange(r.key)}
             className={`rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition ${
               range === r.key
-                ? "border-brand bg-brand/10 text-brand"
+                ? "border-brand-dark bg-brand/15 text-brand-dark"
                 : "border-ink-strong bg-white text-ink-body hover:bg-surface"
             }`}
           >

@@ -29,7 +29,7 @@ export default function CameraBox({
           className="absolute h-[110px] w-[150px] rounded-lg border-2 border-brand"
           style={detection.pos}
         >
-          <div className="absolute -top-5 left-0 rounded bg-brand px-2 py-0.5 text-[10px] font-bold text-white">
+          <div className="absolute -top-5 left-0 rounded bg-brand px-2 py-0.5 text-[10px] font-bold text-brand-ink">
             {detection.name} {Math.round(detection.confidence * 1000) / 10}%
           </div>
         </div>

@@ -23,7 +23,7 @@ export default function Monitoring() {
               <span className="h-2 w-2 rounded-full bg-brand-dark" />
               급식기 1번
             </div>
-            <span className="pill bg-brand/15 text-brand">정상</span>
+            <span className="pill bg-brand/20 text-brand-dark">정상</span>
           </div>
           {/* 카메라 영상/감지 오버레이는 라즈베리파이 + YOLO 스트림 연동 대상 (Sprint 2). */}
           <CameraBox label="급식기 1번 실시간 영상" height={360} status="대기 중" />
@@ -34,7 +34,7 @@ export default function Monitoring() {
               <span className="h-2 w-2 rounded-full bg-accent-danger" />
               급식기 2번
             </div>
-            <span className="pill bg-brand/15 text-brand">정상</span>
+            <span className="pill bg-brand/20 text-brand-dark">정상</span>
           </div>
           <CameraBox label="급식기 2번 실시간 영상" height={360} status="대기 중" />
         </div>

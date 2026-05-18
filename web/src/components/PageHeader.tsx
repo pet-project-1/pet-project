@@ -24,8 +24,8 @@ export default function PageHeader({
 
 export function LiveBadge() {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-1 text-[10px] font-bold text-brand">
-      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand" />
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/15 px-2.5 py-1 text-[10px] font-bold text-brand-dark">
+      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-brand-dark" />
       LIVE
     </span>
   );

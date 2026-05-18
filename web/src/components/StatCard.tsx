@@ -22,7 +22,7 @@ export default function StatCard({
   }[tone];
 
   const numColor = {
-    default: "text-brand",
+    default: "text-brand-dark",
     warn: "text-accent-warn",
     danger: "text-accent-danger",
   }[tone];
