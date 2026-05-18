@@ -81,7 +81,9 @@ export default function Login() {
           <div className="mt-5 flex items-start gap-2 rounded-lg bg-canvas p-3 text-[11px] text-ink-mute">
             <ShieldCheck size={14} className="mt-[1px] shrink-0 text-brand-dark" />
             <div>
-              데모 계정: <b>admin@pawfeeder.com</b> / <b>PawFeeder2026!</b>
+              관리자: <b>admin@pawfeeder.com</b> / <b>PawFeeder2026!</b>
+              <br />
+              수의사: <b>vet@pawfeeder.com</b> / <b>PawFeeder2026!</b>
             </div>
           </div>
         </form>
