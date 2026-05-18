@@ -1,7 +1,8 @@
 // US-03 등록 + US-05 수정 폼 다이얼로그
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { breedOptions, DogService } from "@/services/DogService";
+import { DogService } from "@/services/DogService";
+import { useBreedsQuery } from "@/hooks/queries";
 import type { Dog } from "@/types";
 
 interface Props {
@@ -21,6 +22,8 @@ export default function DogFormDialog({ mode, dog, onClose, onSaved }: Props) {
   const [vetNote, setVetNote] = useState(dog?.vet_note ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const { data: breeds = [] } = useBreedsQuery();
 
   // ESC 닫기
   useEffect(() => {
@@ -88,7 +91,7 @@ export default function DogFormDialog({ mode, dog, onClose, onSaved }: Props) {
           </Field>
           <Field label="품종 *">
             <select className="input" value={breedCode} onChange={(e) => setBreedCode(e.target.value)}>
-              {breedOptions.map((b) => (
+              {breeds.map((b) => (
                 <option key={b.code} value={b.code}>
                   {b.name_ko}
                 </option>

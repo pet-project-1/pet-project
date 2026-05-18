@@ -1,13 +1,19 @@
-// 서버 ↔ 프론트 어댑터.
-// Supabase 가 활성화돼 있으면 PostgREST 호출, 아니면 mockData 폴백.
-// 어떤 모드든 결과 타입은 동일.
+// 서버 ↔ 프론트 어댑터 — 전부 Supabase PostgREST 호출.
+// 매핑 후 결과 타입은 @/types 와 일치.
 
-import { isSupabaseEnabled, supabase } from "./supabase";
-import * as mock from "./mockData";
-import type { AppAlert, Device, Dog, FeedingRecord } from "@/types";
+import { supabase } from "./supabase";
+import type { AppAlert, Breed, Device, Dog, FeedingRecord } from "@/types";
+
+export async function fetchBreeds(): Promise<Breed[]> {
+  const { data, error } = await supabase
+    .from("breeds")
+    .select("code, name_ko, name_en, daily_g_per_kg")
+    .order("name_ko");
+  if (error) throw error;
+  return (data ?? []) as Breed[];
+}
 
 export async function fetchDogs(): Promise<Dog[]> {
-  if (!isSupabaseEnabled || !supabase) return [...mock.dogs];
   const { data, error } = await supabase
     .from("dogs")
     .select("*, breeds:breed_code(name_ko)")
@@ -29,8 +35,7 @@ export async function fetchDogs(): Promise<Dog[]> {
   }));
 }
 
-export async function fetchFeedings(limit = 100): Promise<FeedingRecord[]> {
-  if (!isSupabaseEnabled || !supabase) return [...mock.feedings];
+export async function fetchFeedings(limit = 200): Promise<FeedingRecord[]> {
   const { data, error } = await supabase
     .from("feeding_records")
     .select(
@@ -59,7 +64,6 @@ export async function fetchFeedings(limit = 100): Promise<FeedingRecord[]> {
 }
 
 export async function fetchAlerts(): Promise<AppAlert[]> {
-  if (!isSupabaseEnabled || !supabase) return [...mock.alerts];
   const { data, error } = await supabase
     .from("alerts")
     .select("*")
@@ -78,7 +82,6 @@ export async function fetchAlerts(): Promise<AppAlert[]> {
 }
 
 export async function fetchDevices(): Promise<Device[]> {
-  if (!isSupabaseEnabled || !supabase) return [...mock.devices];
   const { data, error } = await supabase
     .from("devices")
     .select("*")

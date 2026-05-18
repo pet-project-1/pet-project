@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { format } from "date-fns";
+import { format, startOfDay, startOfWeek, startOfMonth, subDays } from "date-fns";
+import { Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import StatusPill from "@/components/StatusPill";
-import { feedings } from "@/lib/mockData";
+import { useFeedingsQuery } from "@/hooks/queries";
 
 const RANGES = [
   { key: "today", label: "오늘" },
@@ -11,10 +12,36 @@ const RANGES = [
   { key: "month", label: "이번 달" },
 ] as const;
 
-export default function History() {
-  const [range, setRange] = useState<(typeof RANGES)[number]["key"]>("today");
+type RangeKey = (typeof RANGES)[number]["key"];
 
-  const rows = useMemo(() => feedings, []);
+// 선택한 기간의 [시작, 끝) 경계를 반환.
+function rangeBounds(key: RangeKey): [number, number] {
+  const now = new Date();
+  switch (key) {
+    case "today":
+      return [startOfDay(now).getTime(), now.getTime()];
+    case "yesterday": {
+      const start = startOfDay(subDays(now, 1));
+      return [start.getTime(), startOfDay(now).getTime()];
+    }
+    case "week":
+      return [startOfWeek(now, { weekStartsOn: 1 }).getTime(), now.getTime()];
+    case "month":
+      return [startOfMonth(now).getTime(), now.getTime()];
+  }
+}
+
+export default function History() {
+  const [range, setRange] = useState<RangeKey>("today");
+  const { data: feedings = [], isLoading } = useFeedingsQuery();
+
+  const rows = useMemo(() => {
+    const [from, to] = rangeBounds(range);
+    return feedings.filter((f) => {
+      const t = new Date(f.scheduled_at).getTime();
+      return t >= from && t <= to;
+    });
+  }, [feedings, range]);
 
   return (
     <>
@@ -57,7 +84,7 @@ export default function History() {
               return (
                 <tr key={f.id} className="border-b border-ink-softline">
                   <td className="px-3 py-3 text-[12px] text-ink-faint">
-                    {format(new Date(f.scheduled_at), "HH:mm")}
+                    {format(new Date(f.scheduled_at), "MM.dd HH:mm")}
                   </td>
                   <td className="px-3 py-3 text-[12px] font-bold text-ink-body">{f.dog_name}</td>
                   <td className="px-3 py-3 text-[12px] text-ink-mute">{f.breed_name_ko}</td>
@@ -90,6 +117,18 @@ export default function History() {
             })}
           </tbody>
         </table>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-10 text-ink-faint">
+            <Loader2 className="mr-2 animate-spin" size={16} /> 로딩 중…
+          </div>
+        ) : (
+          rows.length === 0 && (
+            <div className="py-10 text-center text-[12px] text-ink-mute">
+              해당 기간의 급식 기록이 없습니다.
+            </div>
+          )
+        )}
       </div>
     </>
   );

@@ -1,10 +1,13 @@
 import { format } from "date-fns";
+import { Loader2 } from "lucide-react";
 import PageHeader, { LiveBadge } from "@/components/PageHeader";
 import CameraBox from "@/components/CameraBox";
 import StatusPill from "@/components/StatusPill";
-import { feedings } from "@/lib/mockData";
+import { useFeedingsQuery } from "@/hooks/queries";
 
 export default function Monitoring() {
+  const { data: feedings = [], isLoading } = useFeedingsQuery();
+
   return (
     <>
       <PageHeader
@@ -22,17 +25,8 @@ export default function Monitoring() {
             </div>
             <span className="pill bg-brand/15 text-brand">정상</span>
           </div>
-          <CameraBox
-            label="급식기 1번 실시간 영상"
-            height={360}
-            detection={{
-              name: "몰티즈",
-              confidence: 0.942,
-              pos: { left: "12%", top: "26%" },
-            }}
-            status="급식 진행 중 · 1번 개체"
-            time="09:32:15"
-          />
+          {/* 카메라 영상/감지 오버레이는 라즈베리파이 + YOLO 스트림 연동 대상 (Sprint 2). */}
+          <CameraBox label="급식기 1번 실시간 영상" height={360} status="대기 중" />
         </div>
         <div className="card p-5">
           <div className="mb-4 flex items-center justify-between">
@@ -40,15 +34,9 @@ export default function Monitoring() {
               <span className="h-2 w-2 rounded-full bg-accent-danger" />
               급식기 2번
             </div>
-            <span className="pill bg-accent-danger/15 text-accent-danger">차단 중</span>
+            <span className="pill bg-brand/15 text-brand">정상</span>
           </div>
-          <CameraBox
-            label="급식기 2번 실시간 영상"
-            height={360}
-            blocked={{ pos: { left: "16%", top: "26%" } }}
-            status="배식 중단"
-            time="09:28:42"
-          />
+          <CameraBox label="급식기 2번 실시간 영상" height={360} status="대기 중" />
         </div>
       </div>
 
@@ -57,27 +45,37 @@ export default function Monitoring() {
           <span className="h-2 w-2 rounded-full bg-brand-dark" />
           실시간 급식 로그
         </div>
-        <div className="space-y-1.5">
-          {feedings.map((f) => (
-            <div
-              key={f.id}
-              className="flex items-center gap-4 rounded-lg bg-surface px-3 py-3 text-[12px]"
-            >
-              <span className="w-12 text-ink-faint">
-                {format(new Date(f.scheduled_at), "HH:mm")}
-              </span>
-              <span className="w-40 font-bold text-ink-body">
-                {f.dog_name} {f.breed_name_ko !== "-" && `· ${f.breed_name_ko}`}
-              </span>
-              <span className="flex-1 text-ink-mute">
-                {f.status === "blocked"
-                  ? `${f.device_name} 접근`
-                  : `${f.consumed_g}g / ${f.dispensed_g}g 섭취`}
-              </span>
-              <StatusPill status={f.status} />
-            </div>
-          ))}
-        </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-10 text-ink-faint">
+            <Loader2 className="mr-2 animate-spin" size={16} /> 로딩 중…
+          </div>
+        ) : feedings.length === 0 ? (
+          <div className="py-10 text-center text-[12px] text-ink-mute">
+            급식 기록이 없습니다.
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {feedings.map((f) => (
+              <div
+                key={f.id}
+                className="flex items-center gap-4 rounded-lg bg-surface px-3 py-3 text-[12px]"
+              >
+                <span className="w-12 text-ink-faint">
+                  {format(new Date(f.scheduled_at), "HH:mm")}
+                </span>
+                <span className="w-40 font-bold text-ink-body">
+                  {f.dog_name} {f.breed_name_ko !== "-" && `· ${f.breed_name_ko}`}
+                </span>
+                <span className="flex-1 text-ink-mute">
+                  {f.status === "blocked"
+                    ? `${f.device_name} 접근`
+                    : `${f.consumed_g}g / ${f.dispensed_g}g 섭취`}
+                </span>
+                <StatusPill status={f.status} />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );

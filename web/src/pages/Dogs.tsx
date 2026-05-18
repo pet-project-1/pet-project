@@ -14,7 +14,8 @@ import {
 import PageHeader from "@/components/PageHeader";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { DogService } from "@/services/DogService";
-import { breeds, intake7d, feedings } from "@/lib/mockData";
+import { useBreedsQuery, useFeedingsQuery } from "@/hooks/queries";
+import { buildIntakeSeries } from "@/lib/intake";
 import type { Dog } from "@/types";
 import DogFormDialog from "@/components/DogFormDialog";
 
@@ -28,6 +29,9 @@ export default function Dogs() {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Dog | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Dog | null>(null);
+
+  const { data: breeds = [] } = useBreedsQuery();
+  const { data: feedings = [] } = useFeedingsQuery();
 
   const refresh = async () => {
     const data = await DogService.list();
@@ -65,8 +69,8 @@ export default function Dogs() {
   const onDeleteConfirm = async () => {
     if (!deleteTarget) return;
     try {
-      const hasHistory = feedings.some((f) => f.dog_id === deleteTarget.id);
-      await DogService.remove(deleteTarget.id, hasHistory);
+      // 급식 이력이 있으면 DB 트리거가 차단하고 에러 메시지를 던진다.
+      await DogService.remove(deleteTarget.id);
       setDeleteTarget(null);
       setError(null);
       if (selectedId === deleteTarget.id) setSelectedId(null);
@@ -229,7 +233,7 @@ export default function Dogs() {
                 </div>
                 <div className="h-[140px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={intake7d}>
+                    <BarChart data={buildIntakeSeries(feedings, selected.id, 7)}>
                       <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#8CA0B3" }} axisLine={false} tickLine={false} />
                       <YAxis hide />
                       <Tooltip

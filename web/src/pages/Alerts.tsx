@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
 import { format } from "date-fns";
+import { Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
-import { alerts } from "@/lib/mockData";
-import type { AlertSeverity } from "@/types";
+import { useAlertsQuery } from "@/hooks/queries";
+import type { AlertSeverity, AppAlert } from "@/types";
 
 const filters: { key: "all" | AlertSeverity; label: string }[] = [
   { key: "all", label: "전체" },
@@ -13,24 +14,21 @@ const filters: { key: "all" | AlertSeverity; label: string }[] = [
 
 export default function Alerts() {
   const [filter, setFilter] = useState<(typeof filters)[number]["key"]>("all");
+  const { data: alerts = [], isLoading } = useAlertsQuery();
 
   const today = useMemo(
     () =>
       alerts.filter(
-        (a) =>
-          !a.resolved_at &&
-          (filter === "all" || a.severity === filter)
+        (a) => !a.resolved_at && (filter === "all" || a.severity === filter)
       ),
-    [filter]
+    [alerts, filter]
   );
   const past = useMemo(
     () =>
       alerts.filter(
-        (a) =>
-          a.resolved_at &&
-          (filter === "all" || a.severity === filter)
+        (a) => a.resolved_at && (filter === "all" || a.severity === filter)
       ),
-    [filter]
+    [alerts, filter]
   );
 
   return (
@@ -53,10 +51,16 @@ export default function Alerts() {
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-5">
-        <AlertColumn title="오늘" badgeTone="danger" items={today} />
-        <AlertColumn title="이전" badgeTone="info" items={past} />
-      </div>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-10 text-ink-faint">
+          <Loader2 className="mr-2 animate-spin" size={16} /> 로딩 중…
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-5">
+          <AlertColumn title="오늘" badgeTone="danger" items={today} />
+          <AlertColumn title="이전" badgeTone="info" items={past} />
+        </div>
+      )}
     </>
   );
 }
@@ -67,7 +71,7 @@ function AlertColumn({
   badgeTone,
 }: {
   title: string;
-  items: typeof alerts;
+  items: AppAlert[];
   badgeTone: AlertSeverity;
 }) {
   const tone = {
