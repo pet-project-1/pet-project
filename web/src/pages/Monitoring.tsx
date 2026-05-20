@@ -5,6 +5,9 @@ import CameraBox from "@/components/CameraBox";
 import StatusPill from "@/components/StatusPill";
 import { useFeedingsQuery } from "@/hooks/queries";
 
+const FEEDER_1_ID = import.meta.env.VITE_FEEDER_1_DEVICE_ID;
+const FEEDER_2_ID = import.meta.env.VITE_FEEDER_2_DEVICE_ID;
+
 export default function Monitoring() {
   const { data: feedings = [], isLoading } = useFeedingsQuery();
 
@@ -25,8 +28,11 @@ export default function Monitoring() {
             </div>
             <span className="pill bg-brand/20 text-brand-dark">정상</span>
           </div>
-          {/* 카메라 영상/감지 오버레이는 라즈베리파이 + YOLO 스트림 연동 대상 (Sprint 2). */}
-          <CameraBox label="급식기 1번 실시간 영상" height={360} status="대기 중" />
+          <CameraBox
+            label="급식기 1번 실시간 영상"
+            deviceId={FEEDER_1_ID}
+            height={360}
+          />
         </div>
         <div className="card p-5">
           <div className="mb-4 flex items-center justify-between">
@@ -36,7 +42,11 @@ export default function Monitoring() {
             </div>
             <span className="pill bg-brand/20 text-brand-dark">정상</span>
           </div>
-          <CameraBox label="급식기 2번 실시간 영상" height={360} status="대기 중" />
+          <CameraBox
+            label="급식기 2번 실시간 영상"
+            deviceId={FEEDER_2_ID}
+            height={360}
+          />
         </div>
       </div>
 

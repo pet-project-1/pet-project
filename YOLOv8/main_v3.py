@@ -6,6 +6,8 @@ from ultralytics import YOLO
 from picamera2 import Picamera2
 from flask import Flask, Response
 
+from supabase_realtime_client import SupabaseFrameBroadcaster
+
 MISS_TTL = 6
 MIN_HITS_TO_SHOW = 2
 SAVE_DIR = "./captures"
@@ -26,6 +28,7 @@ def detection_loop():
 
     print("모델 로딩 중...")
     model = YOLO("yolov8n.onnx", task="detect")
+    broadcaster = SupabaseFrameBroadcaster()
 
     if SAVE_DIR:
         os.makedirs(SAVE_DIR, exist_ok=True)
@@ -42,6 +45,7 @@ def detection_loop():
 
     scale_x = STREAM_SIZE[0] / CAPTURE_SIZE[0]
     scale_y = STREAM_SIZE[1] / CAPTURE_SIZE[1]
+    stream_w, stream_h = STREAM_SIZE
 
     track_state = {}
     detection_idx = 0
@@ -63,6 +67,7 @@ def detection_loop():
             )
 
             seen_ids = set()
+            track_conf = {}
 
             for r in results:
                 if r.boxes is None:
@@ -74,6 +79,7 @@ def detection_loop():
                     tid = int(b.id.item())
                     x1, y1, x2, y2 = map(int, b.xyxy[0].tolist())
                     seen_ids.add(tid)
+                    track_conf[tid] = float(b.conf[0].item())
 
                     if tid not in track_state:
                         track_state[tid] = {"bbox": (x1, y1, x2, y2), "miss": 0, "hits": 1}
@@ -90,6 +96,9 @@ def detection_loop():
 
             # 스트리밍용 축소 프레임
             disp = cv2.resize(frame, STREAM_SIZE, interpolation=cv2.INTER_AREA)
+
+            # Supabase 브로드캐스트용 정규화 bbox (0~1, STREAM_SIZE 기준)
+            broadcast_dets = []
 
             for tid, st in track_state.items():
                 if st["hits"] < MIN_HITS_TO_SHOW:
@@ -112,11 +121,29 @@ def detection_loop():
                 cv2.putText(disp, label, (x1 + 3, top + 16),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
 
-            # JPEG 인코딩 후 공유 버퍼에 저장
+                broadcast_dets.append({
+                    "track_id": tid,
+                    "x": x1 / stream_w,
+                    "y": y1 / stream_h,
+                    "w": (x2 - x1) / stream_w,
+                    "h": (y2 - y1) / stream_h,
+                    "conf": round(track_conf.get(tid, 0.0), 3),
+                    "class": "dog",
+                    "stale": is_missing,
+                })
+
+            # JPEG 인코딩 후 공유 버퍼에 저장 (로컬 MJPEG 용)
             _, buf = cv2.imencode('.jpg', disp,
                                   [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
             with frame_lock:
                 latest_frame = buf.tobytes()
+
+            # Supabase Realtime 으로 송출 — broadcaster 가 fps 상한·재축소·재인코딩 처리
+            broadcaster.send_frame(
+                disp,
+                detections=broadcast_dets,
+                status="detecting" if broadcast_dets else "idle",
+            )
 
             if track_state:
                 detected_count = sum(1 for st in track_state.values()
