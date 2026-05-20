@@ -32,7 +32,7 @@ export default function CameraBox({
 
   return (
     <div
-      className="relative overflow-hidden rounded-[10px] border border-sidebar-border bg-sidebar"
+      className="relative mx-auto max-w-[440px] overflow-hidden rounded-[10px] border border-sidebar-border bg-sidebar"
       style={{ height }}
     >
       {stream.frameUrl ? (
