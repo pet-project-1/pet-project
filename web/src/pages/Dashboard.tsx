@@ -18,6 +18,9 @@ import {
   useFeedingsQuery,
 } from "@/hooks/queries";
 
+// 대시보드 "실시간 카메라" 카드는 급식기 1번 스트림을 보여준다.
+const FEEDER_1_ID = import.meta.env.VITE_FEEDER_1_DEVICE_ID;
+
 export default function Dashboard() {
   const { data: dogs = [], isLoading: dogsLoading } = useDogsQuery();
   const { data: feedings = [] } = useFeedingsQuery();
@@ -101,8 +104,8 @@ export default function Dashboard() {
             </div>
             <span className="pill bg-brand/20 text-brand-dark">YOLO v8</span>
           </div>
-          {/* 카메라 영상/감지 오버레이는 라즈베리파이 + YOLO 스트림 연동 대상 (Sprint 2). */}
-          <CameraBox label="실시간 영상 피드" height={280} status="대기 중" />
+          {/* 급식기 1번 카메라의 Supabase Realtime 스트림 — feeder:<VITE_FEEDER_1_DEVICE_ID>. */}
+          <CameraBox label="실시간 영상 피드" deviceId={FEEDER_1_ID} height={280} />
         </div>
 
         <div className="card p-5">
