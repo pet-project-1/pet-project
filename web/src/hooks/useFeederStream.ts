@@ -12,10 +12,10 @@
 //       status                            // "detecting" | "idle" | ...
 //     }
 //
-// Supabase 가 비활성(.env 미설정)이거나 deviceId 가 비면 no-op.
+// deviceId 가 비면 no-op. (Supabase 는 supabase.ts 에서 항상 보장됨)
 
 import { useEffect, useState } from "react";
-import { isSupabaseEnabled, supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase";
 
 export type FeederDetection = {
   track_id?: number;
@@ -42,7 +42,7 @@ export function useFeederStream(deviceId?: string): FeederStreamState {
   const [state, setState] = useState<FeederStreamState>(INITIAL);
 
   useEffect(() => {
-    if (!deviceId || !isSupabaseEnabled || !supabase) {
+    if (!deviceId) {
       setState(INITIAL);
       return;
     }
@@ -70,7 +70,7 @@ export function useFeederStream(deviceId?: string): FeederStreamState {
       });
 
     return () => {
-      supabase!.removeChannel(channel);
+      supabase.removeChannel(channel);
     };
   }, [deviceId]);
 
