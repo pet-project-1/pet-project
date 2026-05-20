@@ -66,6 +66,12 @@ class SupabaseFrameBroadcaster:
         self._session = requests.Session()
         self.enabled = bool(self.url and self.key)
 
+        self.drop_disabled = 0
+        self.drop_fps = 0
+        self.drop_encode = 0
+        self.drop_http = 0
+        self.drop_exc = 0
+
         if not self.enabled:
             print("[broadcast] SUPABASE_URL / SUPABASE_SERVICE_KEY 미설정 — 프레임 송출 비활성")
         else:
@@ -79,11 +85,13 @@ class SupabaseFrameBroadcaster:
     ) -> bool:
         """Annotated 프레임을 브로드캐스트. fps 상한 초과 시 조용히 드롭."""
         if not self.enabled:
+            self.drop_disabled += 1
             return False
 
         now = time.time()
         with self._lock:
             if now - self._last_send < self.min_interval:
+                self.drop_fps += 1
                 return False
             self._last_send = now
 
@@ -100,6 +108,7 @@ class SupabaseFrameBroadcaster:
             ".jpg", frame_small, [cv2.IMWRITE_JPEG_QUALITY, self.jpeg_quality]
         )
         if not ok:
+            self.drop_encode += 1
             return False
 
         payload = {
@@ -125,9 +134,11 @@ class SupabaseFrameBroadcaster:
                 self.endpoint, json=payload, headers=self.headers, timeout=self.timeout
             )
             if r.status_code >= 400:
+                self.drop_http += 1
                 print(f"[broadcast] {r.status_code}: {r.text[:200]}")
                 return False
             return True
         except requests.RequestException as e:
+            self.drop_exc += 1
             print(f"[broadcast] 송출 실패: {e}")
             return False
