@@ -5,14 +5,12 @@ export default function CameraBox({
   label,
   deviceId,
   blocked,
-  height = 280,
   status,
   time,
 }: {
   label: string;
   deviceId?: string;          // Supabase Realtime 토픽 — feeder:<deviceId>
   blocked?: { pos: { left: string; top: string } };
-  height?: number;
   status?: string;
   time?: string;
 }) {
@@ -32,8 +30,7 @@ export default function CameraBox({
 
   return (
     <div
-      className="relative overflow-hidden rounded-[10px] border border-sidebar-border bg-sidebar"
-      style={{ height }}
+      className="relative aspect-square overflow-hidden rounded-[10px] border border-sidebar-border bg-sidebar"
     >
       {stream.frameUrl ? (
         <img
