@@ -105,7 +105,7 @@ export default function Dashboard() {
             <span className="pill bg-brand/20 text-brand-dark">YOLO v8</span>
           </div>
           {/* 급식기 1번 카메라의 Supabase Realtime 스트림 — feeder:<VITE_FEEDER_1_DEVICE_ID>. */}
-          <CameraBox label="실시간 영상 피드" deviceId={FEEDER_1_ID} />
+          <CameraBox label="실시간 영상 피드" deviceId={FEEDER_1_ID} height={320} />
         </div>
 
         <div className="card p-5">

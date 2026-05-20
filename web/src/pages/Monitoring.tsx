@@ -31,6 +31,7 @@ export default function Monitoring() {
           <CameraBox
             label="급식기 1번 실시간 영상"
             deviceId={FEEDER_1_ID}
+            height={400}
           />
         </div>
         <div className="card p-5">
@@ -44,6 +45,7 @@ export default function Monitoring() {
           <CameraBox
             label="급식기 2번 실시간 영상"
             deviceId={FEEDER_2_ID}
+            height={400}
           />
         </div>
       </div>
