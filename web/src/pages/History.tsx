@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Loader2 } from "lucide-react";
@@ -26,6 +26,10 @@ export default function History() {
   const { data: feedings = [], isLoading } = useFeedingsQuery();
   const { data: dogs = [] } = useDogsQuery();
 
+  // 날짜 범위 필터 (yyyy-MM-dd 문자열, 빈 값이면 무제한).
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+
   const activeDogs = useMemo(
     () => dogs.filter((d) => d.status === "active"),
     [dogs]
@@ -34,17 +38,22 @@ export default function History() {
   const todayKey = format(new Date(), "yyyy-MM-dd");
 
   // 모든 급식 기록을 날짜별로 묶어 일지화 (최신 날짜 먼저).
-  // 오늘 카드는 기록이 0건이어도 항상 포함 — 실시간 현황판 역할.
+  // 오늘 카드는 기록이 0건이어도 항상 포함 — 단, 필터 범위 안일 때만.
   const days: DayEntry[] = useMemo(() => {
+    // ISO 날짜 문자열은 사전순 비교 = 시간순 비교.
+    const inRange = (key: string) =>
+      (!from || key >= from) && (!to || key <= to);
+
     const byDay = new Map<string, FeedingRecord[]>();
     for (const f of feedings) {
       const key = format(new Date(f.scheduled_at), "yyyy-MM-dd");
       if (!byDay.has(key)) byDay.set(key, []);
       byDay.get(key)!.push(f);
     }
-    if (!byDay.has(todayKey)) byDay.set(todayKey, []);
+    if (inRange(todayKey) && !byDay.has(todayKey)) byDay.set(todayKey, []);
 
     return [...byDay.entries()]
+      .filter(([key]) => inRange(key))
       .sort((a, b) => (a[0] < b[0] ? 1 : -1))
       .map(([dayKey, recs]) => {
         const perDog: DogDay[] = activeDogs
@@ -67,15 +76,53 @@ export default function History() {
           perDog,
         };
       });
-  }, [feedings, activeDogs, todayKey]);
+  }, [feedings, activeDogs, todayKey, from, to]);
+
+  const dateInput =
+    "rounded-lg border border-ink-strong bg-white px-3 py-1.5 text-[12px] text-ink-body";
 
   return (
     <>
       <PageHeader title="급식 일지" subtitle="날짜별 개체 급식 기록" />
 
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <input
+          type="date"
+          value={from}
+          max={to || undefined}
+          onChange={(e) => setFrom(e.target.value)}
+          className={dateInput}
+          aria-label="시작일"
+        />
+        <span className="text-[12px] text-ink-faint">~</span>
+        <input
+          type="date"
+          value={to}
+          min={from || undefined}
+          onChange={(e) => setTo(e.target.value)}
+          className={dateInput}
+          aria-label="종료일"
+        />
+        {(from || to) && (
+          <button
+            onClick={() => {
+              setFrom("");
+              setTo("");
+            }}
+            className="rounded-lg border border-ink-strong bg-white px-3 py-1.5 text-[12px] font-semibold text-ink-body transition hover:bg-surface"
+          >
+            전체
+          </button>
+        )}
+      </div>
+
       {isLoading ? (
         <div className="flex items-center justify-center py-10 text-ink-faint">
           <Loader2 className="mr-2 animate-spin" size={16} /> 로딩 중…
+        </div>
+      ) : days.length === 0 ? (
+        <div className="card p-5 py-10 text-center text-[12px] text-ink-mute">
+          해당 기간의 급식 기록이 없습니다.
         </div>
       ) : (
         <div className="space-y-5">
