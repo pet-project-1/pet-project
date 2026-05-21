@@ -1,6 +1,7 @@
 // US-04 개체 조회 + US-05 수정 + US-06 삭제 진입점
 // US-03 등록은 별도 다이얼로그에서.
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Plus, Search, Pencil, Trash2, BarChart3 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -27,8 +28,34 @@ export default function Dogs() {
   const [error, setError] = useState<string | null>(null);
 
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [pendingTarget, setPendingTarget] = useState<
+    { trackId: number; deviceId: string } | null
+  >(null);
   const [editTarget, setEditTarget] = useState<Dog | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Dog | null>(null);
+
+  // 알람 클릭으로 들어온 경우: ?registerPendingTid=<tid>&deviceId=<id>
+  // → 자동으로 등록 모달을 pending 모드로 연다.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    const tidStr = searchParams.get("registerPendingTid");
+    const deviceId = searchParams.get("deviceId");
+    if (tidStr && deviceId) {
+      const tid = Number(tidStr);
+      if (Number.isFinite(tid)) {
+        setPendingTarget({ trackId: tid, deviceId });
+        setRegisterOpen(true);
+      }
+    }
+  }, [searchParams]);
+
+  const closeRegister = () => {
+    setRegisterOpen(false);
+    setPendingTarget(null);
+    if (searchParams.get("registerPendingTid")) {
+      setSearchParams({}, { replace: true });
+    }
+  };
 
   const { data: breeds = [] } = useBreedsQuery();
   const { data: feedings = [] } = useFeedingsQuery();
@@ -85,7 +112,13 @@ export default function Dogs() {
         title="개체 관리"
         subtitle="등록된 개체 정보 및 상세 관리"
         right={
-          <button className="btn-primary" onClick={() => setRegisterOpen(true)}>
+          <button
+            className="btn-primary"
+            onClick={() => {
+              setPendingTarget(null);
+              setRegisterOpen(true);
+            }}
+          >
             <Plus size={16} /> 개체 등록
           </button>
         }
@@ -250,13 +283,14 @@ export default function Dogs() {
         </div>
       </div>
 
-      {/* 등록 다이얼로그 (US-03) */}
+      {/* 등록 다이얼로그 (US-03) — pendingTarget 있으면 Pi /register 호출 모드 */}
       {registerOpen && (
         <DogFormDialog
           mode="create"
-          onClose={() => setRegisterOpen(false)}
+          pending={pendingTarget ?? undefined}
+          onClose={closeRegister}
           onSaved={() => {
-            setRegisterOpen(false);
+            closeRegister();
             refresh();
           }}
         />

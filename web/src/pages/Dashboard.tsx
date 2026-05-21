@@ -4,6 +4,7 @@
 // AC3: Supabase Realtime 으로 실시간 데이터 반영 (← <Layout> 의 useRealtime 훅)
 
 import { useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Loader2 } from "lucide-react";
@@ -17,11 +18,13 @@ import {
   useDogsQuery,
   useFeedingsQuery,
 } from "@/hooks/queries";
+import { parseUnregisteredAccessMessage } from "@/lib/feederApi";
 
 // 대시보드 "실시간 카메라" 카드는 급식기 1번 스트림을 보여준다.
 const FEEDER_1_ID = import.meta.env.VITE_FEEDER_1_DEVICE_ID;
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { data: dogs = [], isLoading: dogsLoading } = useDogsQuery();
   const { data: feedings = [] } = useFeedingsQuery();
   const { data: alerts = [] } = useAlertsQuery();
@@ -118,44 +121,59 @@ export default function Dashboard() {
             </span>
           </div>
           <div className="space-y-2">
-            {alerts.slice(0, 4).map((a) => (
-              <div
-                key={a.id}
-                className="flex items-start gap-2.5 rounded-lg bg-surface p-3"
-                style={{
-                  borderLeft: `3px solid ${
-                    a.severity === "danger"
-                      ? "#E76F51"
-                      : a.severity === "warn"
-                      ? "#F4A261"
-                      : "#5C8214"
-                  }`,
-                }}
-              >
+            {alerts.slice(0, 4).map((a) => {
+              const meta =
+                a.type === "unregistered_access"
+                  ? parseUnregisteredAccessMessage(a.message)
+                  : null;
+              const isClickable = !!meta && !a.resolved_at;
+              const onClick = isClickable
+                ? () =>
+                    navigate(
+                      `/dogs?registerPendingTid=${meta!.track_id}&deviceId=${meta!.device_id}`,
+                    )
+                : undefined;
+              const color =
+                a.severity === "danger"
+                  ? "#E76F51"
+                  : a.severity === "warn"
+                  ? "#F4A261"
+                  : "#5C8214";
+              return (
                 <div
-                  className="mt-1 h-2 w-2 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor:
-                      a.severity === "danger"
-                        ? "#E76F51"
-                        : a.severity === "warn"
-                        ? "#F4A261"
-                        : "#5C8214",
+                  key={a.id}
+                  role={isClickable ? "button" : undefined}
+                  tabIndex={isClickable ? 0 : undefined}
+                  onClick={onClick}
+                  onKeyDown={(e) => {
+                    if (isClickable && (e.key === "Enter" || e.key === " ")) {
+                      e.preventDefault();
+                      onClick?.();
+                    }
                   }}
-                />
-                <div className="min-w-0">
-                  <div className="text-[12px] font-bold text-ink-body">
-                    {a.title}
-                  </div>
-                  <div className="truncate text-[11px] text-ink-mute">
-                    {a.message}
-                  </div>
-                  <div className="mt-0.5 text-[10px] text-ink-faint">
-                    {format(new Date(a.created_at), "MM.dd HH:mm")}
+                  className={`flex items-start gap-2.5 rounded-lg bg-surface p-3 ${
+                    isClickable ? "cursor-pointer transition hover:bg-brand/5" : ""
+                  }`}
+                  style={{ borderLeft: `3px solid ${color}` }}
+                >
+                  <div
+                    className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: color }}
+                  />
+                  <div className="min-w-0">
+                    <div className="text-[12px] font-bold text-ink-body">
+                      {a.title}
+                    </div>
+                    <div className="truncate text-[11px] text-ink-mute">
+                      {meta ? "클릭하여 개체 등록 →" : a.message}
+                    </div>
+                    <div className="mt-0.5 text-[10px] text-ink-faint">
+                      {format(new Date(a.created_at), "MM.dd HH:mm")}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {alerts.length === 0 && (
               <div className="py-4 text-center text-[12px] text-ink-faint">
                 알림이 없습니다.

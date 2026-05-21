@@ -1,8 +1,10 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { useAlertsQuery } from "@/hooks/queries";
+import { parseUnregisteredAccessMessage } from "@/lib/feederApi";
 import type { AlertSeverity, AppAlert } from "@/types";
 
 const filters: { key: "all" | AlertSeverity; label: string }[] = [
@@ -13,6 +15,7 @@ const filters: { key: "all" | AlertSeverity; label: string }[] = [
 ];
 
 export default function Alerts() {
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<(typeof filters)[number]["key"]>("all");
   const { data: alerts = [], isLoading } = useAlertsQuery();
 
@@ -57,7 +60,20 @@ export default function Alerts() {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-5">
-          <AlertColumn title="오늘" badgeTone="danger" items={today} />
+          <AlertColumn
+            title="오늘"
+            badgeTone="danger"
+            items={today}
+            onItemClick={(a) => {
+              if (a.type !== "unregistered_access") return;
+              const meta = parseUnregisteredAccessMessage(a.message);
+              if (meta) {
+                navigate(
+                  `/dogs?registerPendingTid=${meta.track_id}&deviceId=${meta.device_id}`,
+                );
+              }
+            }}
+          />
           <AlertColumn title="이전" badgeTone="info" items={past} />
         </div>
       )}
@@ -69,10 +85,12 @@ function AlertColumn({
   title,
   items,
   badgeTone,
+  onItemClick,
 }: {
   title: string;
   items: AppAlert[];
   badgeTone: AlertSeverity;
+  onItemClick?: (a: AppAlert) => void;
 }) {
   const tone = {
     danger: "bg-accent-danger/15 text-accent-danger",
@@ -95,42 +113,53 @@ function AlertColumn({
         </div>
       ) : (
         <div className="space-y-2">
-          {items.map((a) => (
-            <div
-              key={a.id}
-              className="rounded-lg bg-surface p-3"
-              style={{
-                borderLeft: `3px solid ${
-                  a.severity === "danger"
-                    ? "#E76F51"
-                    : a.severity === "warn"
-                    ? "#F4A261"
-                    : "#5C8214"
-                }`,
-              }}
-            >
-              <div className="flex items-start gap-2.5">
-                <div
-                  className="mt-1 h-2 w-2 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor:
-                      a.severity === "danger"
-                        ? "#E76F51"
-                        : a.severity === "warn"
-                        ? "#F4A261"
-                        : "#5C8214",
-                  }}
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="text-[12px] font-bold text-ink-body">{a.title}</div>
-                  <div className="text-[11px] text-ink-mute">{a.message}</div>
-                  <div className="mt-0.5 text-[10px] text-ink-faint">
-                    {format(new Date(a.created_at), "MM.dd HH:mm")}
+          {items.map((a) => {
+            const meta =
+              a.type === "unregistered_access"
+                ? parseUnregisteredAccessMessage(a.message)
+                : null;
+            const isClickable = !!onItemClick && !!meta && !a.resolved_at;
+            const color =
+              a.severity === "danger"
+                ? "#E76F51"
+                : a.severity === "warn"
+                ? "#F4A261"
+                : "#5C8214";
+            return (
+              <div
+                key={a.id}
+                role={isClickable ? "button" : undefined}
+                tabIndex={isClickable ? 0 : undefined}
+                onClick={isClickable ? () => onItemClick!(a) : undefined}
+                onKeyDown={(e) => {
+                  if (isClickable && (e.key === "Enter" || e.key === " ")) {
+                    e.preventDefault();
+                    onItemClick!(a);
+                  }
+                }}
+                className={`rounded-lg bg-surface p-3 ${
+                  isClickable ? "cursor-pointer transition hover:bg-brand/5" : ""
+                }`}
+                style={{ borderLeft: `3px solid ${color}` }}
+              >
+                <div className="flex items-start gap-2.5">
+                  <div
+                    className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: color }}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[12px] font-bold text-ink-body">{a.title}</div>
+                    <div className="text-[11px] text-ink-mute">
+                      {meta ? "클릭하여 개체 등록 →" : a.message}
+                    </div>
+                    <div className="mt-0.5 text-[10px] text-ink-faint">
+                      {format(new Date(a.created_at), "MM.dd HH:mm")}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

@@ -2,12 +2,15 @@ node_modules
 dist
 dist-ssr
 .env
+.env.example
 .env.local
 .env.*.local
 .DS_Store
 *.log
 .vscode/*
 !.vscode/extensions.json
+*.sh
+*.service
 
 # Supabase
 .branches
@@ -23,3 +26,7 @@ supabase/.temp/
 YOLOv8/*.pt
 YOLOv8/datasets/
 .vercel
+
+# smart_feeder — 모델 가중치 (대용량) & vendored OSNet 라이브러리
+smart_feeder/models/
+smart_feeder/deep-person-reid/
