@@ -73,6 +73,13 @@ export default function History() {
       byDay.get(key)!.push(f);
     }
 
+    // 오늘이 선택 범위 안이면 기록이 0건이어도 오늘 카드를 보장 — 실시간 현황판 역할.
+    const tKey = format(new Date(), "yyyy-MM-dd");
+    const tMs = startOfDay(new Date()).getTime();
+    if (tMs >= from && tMs <= to && !byDay.has(tKey)) {
+      byDay.set(tKey, []);
+    }
+
     return [...byDay.entries()]
       .sort((a, b) => (a[0] < b[0] ? 1 : -1)) // 최신 날짜 먼저
       .map(([dayKey, recs]) => {
@@ -98,9 +105,11 @@ export default function History() {
       });
   }, [feedings, activeDogs, range]);
 
+  const todayKey = format(new Date(), "yyyy-MM-dd");
+
   return (
     <>
-      <PageHeader title="급식 일지" subtitle="날짜별 개체 급식 기록" />
+      <PageHeader title="급식 일지" subtitle="오늘 현황 + 날짜별 급식 기록" />
 
       <div className="mb-4 flex gap-2">
         {RANGES.map((r) => (
@@ -134,6 +143,9 @@ export default function History() {
                 <div className="flex items-center gap-2 text-[14px] font-bold text-ink-body">
                   <span className="h-2 w-2 rounded-full bg-brand-dark" />
                   {format(day.date, "M월 d일 (EEE)", { locale: ko })}
+                  {day.dayKey === todayKey && (
+                    <span className="pill bg-brand-dark text-white">오늘</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 text-[12px] text-ink-mute">
                   <span>
