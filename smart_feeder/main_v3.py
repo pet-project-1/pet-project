@@ -36,8 +36,11 @@ from feeder_api import (
     start_in_thread as start_http_api,
     fetch_dogs_with_embedding,
     insert_unregistered_access_alert,
+    insert_feeding_blocked_alert,
     resolve_alert,
 )
+from audio import AudioPlayer
+from feeding_session import FeedingSession
 
 
 def _first_existing(*paths, fallback=None):
@@ -63,6 +66,19 @@ BREED_LABELS_PATH = _first_existing(
     os.path.join(_HERE, "..", "dog_breeds.txt"),
     fallback=os.path.join(_HERE, "..", "dog_breeds.txt"),
 )
+# 음성 / 경고 WAV 디렉터리 — 파일 자체는 git 미포함 (수동 배치).
+#   sounds/dogs/<dog_id>.wav  : 개체별 호명 음성
+#   sounds/warning.wav        : 미등록 개체 접근 시 경고음
+SOUNDS_DIR = os.path.join(_HERE, "sounds")
+VOICE_DIR = os.path.join(SOUNDS_DIR, "dogs")
+WARNING_WAV = os.path.join(SOUNDS_DIR, "warning.wav")
+# aplay -D 에 넘길 ALSA 디바이스 (예: 'plughw:2,0'). 비우면 ~/.asoundrc default.
+AUDIO_DEVICE = os.getenv("FEEDER_AUDIO_DEVICE", "") or None
+
+
+def voice_wav_path(dog_id):
+    """dog_id → 호명 WAV 경로. 파일 부재 여부는 AudioPlayer 가 silent skip."""
+    return os.path.join(VOICE_DIR, f"{dog_id}.wav")
 # bytetrack yaml: 로컬 → YOLOv8/ → ultralytics 내장 기본값 순으로 시도
 BYTETRACK_YAML = _first_existing(
     os.path.join(_HERE, "custom_bytetrack.yaml"),
@@ -88,6 +104,12 @@ MIN_BBOX_SIZE = 50
 # pending 객체가 카메라에서 사라진 채로 이 시간이 지나면 자동 만료.
 # (사용자가 등록하지 않은 false positive 가 영구히 누적되는 걸 방지.)
 PENDING_TTL_SEC = 60
+
+# watchdog — 5 초 간격 stats cycle 에서 카운터 델타가 0 인 채로 이만큼 연속이면
+# 해당 스레드가 silent death 한 걸로 보고 프로세스 종료 → systemd 재시작.
+# 정상 운영 시 captured/sent 는 매 cycle 수십~수백, inferred 도 Pi CPU 에서
+# ~0.3 fps × 5s = 1.5 이상이라 15 초 (3 cycle) 동안 0 이면 명백히 비정상.
+WATCHDOG_STALL_CYCLES = 3
 # 등록된 갤러리 feature 와 거리가 이 값 미만인 다른 pending tid 는 "같은 개체"로 보고
 # commit_registration 시 같이 정리. 보통 DIST_THRESHOLD 와 동일하게 두면 됨.
 PENDING_DEDUP_DIST = DIST_THRESHOLD
@@ -506,7 +528,7 @@ def capture_loop(picam2, raw_slot, counters, stop_event):
         counters["captured"] += 1
 
 
-def infer_loop(yolo, reid, raw_slot, det_slot, counters, stop_event):
+def infer_loop(yolo, reid, raw_slot, det_slot, counters, stop_event, feeding):
     track_state = {}
     last_counter = -1
 
@@ -555,7 +577,10 @@ def infer_loop(yolo, reid, raw_slot, det_slot, counters, stop_event):
                     and (x2 - x1) >= MIN_BBOX_SIZE
                     and (y2 - y1) >= MIN_BBOX_SIZE
                 ):
-                    reid.process_crop(tid, frame[y1:y2, x1:x2])
+                    stable_id = reid.process_crop(tid, frame[y1:y2, x1:x2])
+                    # 급식 세션 중 미등록 개체 → 경고음 + alert (debounce 는 세션 내부).
+                    if stable_id == UNKNOWN_LABEL and feeding.is_active():
+                        feeding.on_unknown_detected(tid, WARNING_WAV)
 
         for tid in list(track_state.keys()):
             if tid not in seen_ids:
@@ -685,8 +710,23 @@ def main():
 
     print("카메라 구동 시작 (Ctrl+C 로 종료)")
 
+    # 오디오 + 급식 세션. 급식 차단 시 daemon thread 로 alert insert.
+    audio = AudioPlayer(aplay_device=AUDIO_DEVICE)
+
+    def _spawn_feeding_blocked_alert(tid):
+        threading.Thread(
+            target=insert_feeding_blocked_alert,
+            args=(FEEDER_DEVICE_ID, tid),
+            name=f"feeding-blocked-{tid}",
+            daemon=True,
+        ).start()
+
+    feeding = FeedingSession(audio=audio,
+                             on_blocked=_spawn_feeding_blocked_alert)
+
     api_port = int(os.environ.get("FEEDER_API_PORT", "8765"))
-    start_http_api(reid, port=api_port)
+    start_http_api(reid, feeding=feeding,
+                   voice_wav_resolver=voice_wav_path, port=api_port)
 
     raw_slot = _FrameSlot()
     det_slot = _Slot(init=[])
@@ -698,7 +738,7 @@ def main():
                          args=(picam2, raw_slot, counters, stop_event),
                          name="capture", daemon=True),
         threading.Thread(target=infer_loop,
-                         args=(yolo, reid, raw_slot, det_slot, counters, stop_event),
+                         args=(yolo, reid, raw_slot, det_slot, counters, stop_event, feeding),
                          name="infer", daemon=True),
         threading.Thread(target=broadcast_loop,
                          args=(broadcaster, raw_slot, det_slot, counters, stop_event),
@@ -711,6 +751,9 @@ def main():
     prev = dict(counters)
     prev_drops = {k: getattr(broadcaster, k) for k in drop_attrs}
     prev_t = time.time()
+    # 스레드별 연속 0 cycle 카운터 — WATCHDOG_STALL_CYCLES 도달하면 silent death 로 판정.
+    stall = {"captured": 0, "inferred": 0, "sent": 0}
+    watchdog_exit_code = 0
 
     try:
         while not stop_event.is_set():
@@ -719,22 +762,37 @@ def main():
             now = time.time()
             elapsed = now - prev_t
 
-            dc = counters["captured"] - prev["captured"]
-            di = counters["inferred"] - prev["inferred"]
-            ds = counters["sent"] - prev["sent"]
+            deltas = {
+                "captured": counters["captured"] - prev["captured"],
+                "inferred": counters["inferred"] - prev["inferred"],
+                "sent": counters["sent"] - prev["sent"],
+            }
 
             drops_now = {k: getattr(broadcaster, k) for k in drop_attrs}
             dd = {k: drops_now[k] - prev_drops[k] for k in drop_attrs}
 
             print(
                 f"[stats] {elapsed:.1f}s  "
-                f"captured={dc} ({dc/elapsed:.1f} fps)  "
-                f"inferred={di} ({di/elapsed:.1f} fps)  "
-                f"sent={ds} ({ds/elapsed:.1f} fps)  "
+                f"captured={deltas['captured']} ({deltas['captured']/elapsed:.1f} fps)  "
+                f"inferred={deltas['inferred']} ({deltas['inferred']/elapsed:.1f} fps)  "
+                f"sent={deltas['sent']} ({deltas['sent']/elapsed:.1f} fps)  "
                 f"gallery={len(reid.list_gallery())} pending={len(reid.list_pending())}  "
                 f"(disabled={dd['drop_disabled']} fps={dd['drop_fps']} "
                 f"encode={dd['drop_encode']} http={dd['drop_http']} exc={dd['drop_exc']})"
             )
+
+            # watchdog: 0 델타 누적 추적 + 임계치 도달 시 종료
+            for k, d in deltas.items():
+                stall[k] = stall[k] + 1 if d == 0 else 0
+            stalled = [k for k, v in stall.items() if v >= WATCHDOG_STALL_CYCLES]
+            if stalled:
+                print(
+                    f"[WATCHDOG] threads stalled for {WATCHDOG_STALL_CYCLES * 5}s: "
+                    f"{stalled} — exiting for systemd restart"
+                )
+                watchdog_exit_code = 1
+                break
+
             prev = dict(counters)
             prev_drops = drops_now
             prev_t = now
@@ -746,6 +804,8 @@ def main():
             t.join(timeout=2.0)
         picam2.stop()
         print("카메라 종료.")
+        if watchdog_exit_code:
+            sys.exit(watchdog_exit_code)
 
 
 if __name__ == "__main__":

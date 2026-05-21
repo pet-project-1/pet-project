@@ -28,6 +28,23 @@ export interface RegisterPayload {
 export interface UnregisteredAccessMeta {
   device_id: string;
   track_id: number;
+  // 급식 세션 중 차단 케이스 — alert 표시 / 처리 분기에 사용.
+  kind?: "feeding_blocked";
+}
+
+export interface FeedingStatus {
+  dog_id: string;
+  name: string;
+  started_at: number;
+  ends_at: number;
+  remaining_sec: number;
+  blocked_count: number;
+}
+
+export interface FeedingStartPayload {
+  dog_id: string;
+  name?: string;
+  duration_sec?: number;
 }
 
 const FEEDERS: { deviceId?: string; apiUrl?: string }[] = [
@@ -52,8 +69,9 @@ export function deviceIdToApiUrl(deviceId: string | null | undefined): string | 
   return FEEDERS.find((f) => f.deviceId === deviceId)?.apiUrl;
 }
 
-// Pi 가 alerts.message 에 JSON.stringify({device_id, track_id}) 로 임베드한 식별자를 추출.
-// 옛 포맷(text)이거나 다른 alert type 이면 null.
+// Pi 가 alerts.message 에 JSON.stringify({device_id, track_id, kind?}) 로 임베드한
+// 식별자를 추출. 옛 포맷(text)이거나 다른 alert type 이면 null.
+// kind === 'feeding_blocked' 면 급식 세션 중 차단 케이스.
 export function parseUnregisteredAccessMessage(message: string): UnregisteredAccessMeta | null {
   try {
     const parsed = JSON.parse(message);
@@ -62,7 +80,12 @@ export function parseUnregisteredAccessMessage(message: string): UnregisteredAcc
       typeof parsed.device_id === "string" &&
       typeof parsed.track_id === "number"
     ) {
-      return parsed as UnregisteredAccessMeta;
+      const out: UnregisteredAccessMeta = {
+        device_id: parsed.device_id,
+        track_id: parsed.track_id,
+      };
+      if (parsed.kind === "feeding_blocked") out.kind = "feeding_blocked";
+      return out;
     }
   } catch {
     /* JSON 아님 — null */
@@ -95,4 +118,27 @@ export async function registerPendingDog(
     throw new Error(json.error || `등록 실패 (HTTP ${resp.status})`);
   }
   return { dog_id: json.dog_id, name: json.name, track_id: json.track_id };
+}
+
+export async function startFeeding(
+  apiUrl: string,
+  payload: FeedingStartPayload,
+): Promise<FeedingStatus> {
+  const resp = await fetch(`${apiUrl}/feeding/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders() },
+    body: JSON.stringify(payload),
+  });
+  const json = await resp.json().catch(() => ({} as any));
+  if (!resp.ok || json.ok === false) {
+    throw new Error(json.error || `급식 시작 실패 (HTTP ${resp.status})`);
+  }
+  return json.status as FeedingStatus;
+}
+
+export async function getFeedingStatus(apiUrl: string): Promise<FeedingStatus | null> {
+  const resp = await fetch(`${apiUrl}/feeding/status`, { headers: authHeaders() });
+  if (!resp.ok) throw new Error(`급식 상태 조회 실패 (HTTP ${resp.status})`);
+  const json = await resp.json();
+  return (json.status as FeedingStatus | null) ?? null;
 }

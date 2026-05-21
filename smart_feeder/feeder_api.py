@@ -84,29 +84,24 @@ def fetch_dogs_with_embedding():
     return resp.json() or []
 
 
-def _alert_message_payload(device_id, track_id):
+def _alert_message_payload(device_id, track_id, kind=None):
     """alerts.message 에 식별자를 JSON 으로 임베드.
     웹은 type=='unregistered_access' 인 alert 의 message 를 JSON.parse 로 풀어서
-    (device_id, track_id) 추출 → /dogs?registerPendingTid=...&deviceId=... 라우팅.
+    (device_id, track_id, kind?) 추출.
+    kind 'feeding_blocked' 면 급식 차단 케이스로 구분.
     """
-    return json.dumps({"device_id": device_id, "track_id": track_id},
-                      ensure_ascii=False)
+    body = {"device_id": device_id, "track_id": track_id}
+    if kind:
+        body["kind"] = kind
+    return json.dumps(body, ensure_ascii=False)
 
 
-def insert_unregistered_access_alert(device_id, track_id):
-    """미등록 개체 접근 알림 1 건 insert. 성공 시 alert_id (uuid str), 실패 시 None.
-    pending feature 가 새로 생기는 순간에만 호출 (process_crop 의 'is_new' branch).
-    """
+def _insert_alert(payload):
+    """공통 insert. 성공 시 alert_id (uuid), 실패 시 None."""
     url, key = _supabase_config()
     if not url or not key:
         print("[alerts] supabase not configured — skipping alert insert")
         return None
-    payload = {
-        "type": "unregistered_access",
-        "severity": "warn",
-        "title": f"미등록 개체 #{track_id} 접근",
-        "message": _alert_message_payload(device_id, track_id),
-    }
     try:
         resp = requests.post(
             f"{url}/rest/v1/alerts",
@@ -121,9 +116,30 @@ def insert_unregistered_access_alert(device_id, track_id):
         print(f"[alerts] insert error {resp.status_code}: {resp.text[:200]}")
         return None
     rows = resp.json() or []
-    if not rows:
-        return None
-    return rows[0].get("id")
+    return rows[0].get("id") if rows else None
+
+
+def insert_unregistered_access_alert(device_id, track_id):
+    """미등록 개체 접근 알림 (일반) — pending feature 가 새로 생기는 순간에 호출."""
+    return _insert_alert({
+        "type": "unregistered_access",
+        "severity": "warn",
+        "title": f"미등록 개체 #{track_id} 접근",
+        "message": _alert_message_payload(device_id, track_id),
+    })
+
+
+def insert_feeding_blocked_alert(device_id, track_id):
+    """급식 세션 중 미등록 개체 감지 → 급식 차단 alert.
+    type 은 enum 재사용 (`unregistered_access`), kind='feeding_blocked' 로 구분.
+    """
+    return _insert_alert({
+        "type": "unregistered_access",
+        "severity": "danger",
+        "title": f"급식 차단 — 미등록 개체 #{track_id} 접근",
+        "message": _alert_message_payload(device_id, track_id,
+                                          kind="feeding_blocked"),
+    })
 
 
 def resolve_alert(alert_id):
@@ -180,7 +196,13 @@ def _insert_dog(payload):
     return rows[0]["id"], None, 201
 
 
-def create_app(reid):
+def create_app(reid, *, feeding=None, voice_wav_resolver=None):
+    """
+    reid: SmartFeederReID
+    feeding: FeedingSession (optional — None 이면 /feeding/* 가 503)
+    voice_wav_resolver: callable(dog_id: str) → wav path (str)
+                       feeding 사용 시 필수.
+    """
     app = Flask(__name__)
     token = os.environ.get("FEEDER_API_TOKEN", "").strip()
 
@@ -290,14 +312,49 @@ def create_app(reid):
             "supabase_configured": bool(url and key),
             "gallery_size": len(reid.list_gallery()),
             "pending_count": len(reid.list_pending()),
+            "feeding_active": feeding is not None and feeding.is_active(),
         })
+
+    @app.post("/feeding/start")
+    def feeding_start():
+        if feeding is None or voice_wav_resolver is None:
+            return jsonify({"ok": False, "error": "feeding not configured"}), 503
+        body = request.get_json(silent=True) or {}
+        dog_id = body.get("dog_id")
+        name = body.get("name") or ""
+        duration_sec = body.get("duration_sec", 60)
+        if not isinstance(dog_id, str) or not dog_id.strip():
+            return jsonify({"ok": False, "error": "dog_id (string) required"}), 400
+        if not isinstance(name, str):
+            return jsonify({"ok": False, "error": "name must be string"}), 400
+        try:
+            duration_sec = int(duration_sec)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "duration_sec must be int"}), 400
+        if duration_sec <= 0 or duration_sec > 600:
+            return jsonify({"ok": False, "error": "duration_sec out of range (1..600)"}), 400
+
+        voice_path = voice_wav_resolver(dog_id.strip())
+        ok, err = feeding.start(dog_id.strip(), name.strip(),
+                                voice_path, duration_sec=duration_sec)
+        if not ok:
+            # 동시 시작 충돌은 409
+            return jsonify({"ok": False, "error": err}), 409
+        return jsonify({"ok": True, "status": feeding.status()}), 201
+
+    @app.get("/feeding/status")
+    def feeding_status():
+        if feeding is None:
+            return jsonify({"status": None})
+        return jsonify({"status": feeding.status()})
 
     return app
 
 
-def start_in_thread(reid, host="0.0.0.0", port=8765):
+def start_in_thread(reid, *, feeding=None, voice_wav_resolver=None,
+                    host="0.0.0.0", port=8765):
     """Flask 앱을 데몬 스레드로 시동."""
-    app = create_app(reid)
+    app = create_app(reid, feeding=feeding, voice_wav_resolver=voice_wav_resolver)
 
     def _run():
         from werkzeug.serving import run_simple
