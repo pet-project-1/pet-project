@@ -35,7 +35,7 @@ export async function fetchDogs(): Promise<Dog[]> {
   }));
 }
 
-export async function fetchFeedings(limit = 200): Promise<FeedingRecord[]> {
+export async function fetchFeedings(limit = 1000): Promise<FeedingRecord[]> {
   const { data, error } = await supabase
     .from("feeding_records")
     .select(

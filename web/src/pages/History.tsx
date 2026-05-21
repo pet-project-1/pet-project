@@ -1,36 +1,10 @@
-import { useMemo, useState } from "react";
-import { format, startOfDay, startOfWeek, startOfMonth, subDays } from "date-fns";
+import { useMemo } from "react";
+import { format } from "date-fns";
 import { ko } from "date-fns/locale";
 import { Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { useDogsQuery, useFeedingsQuery } from "@/hooks/queries";
 import type { Dog, FeedingRecord } from "@/types";
-
-const RANGES = [
-  { key: "today", label: "오늘" },
-  { key: "yesterday", label: "어제" },
-  { key: "week", label: "이번 주" },
-  { key: "month", label: "이번 달" },
-] as const;
-
-type RangeKey = (typeof RANGES)[number]["key"];
-
-// 선택한 기간의 [시작, 끝) 경계를 반환.
-function rangeBounds(key: RangeKey): [number, number] {
-  const now = new Date();
-  switch (key) {
-    case "today":
-      return [startOfDay(now).getTime(), now.getTime()];
-    case "yesterday": {
-      const start = startOfDay(subDays(now, 1));
-      return [start.getTime(), startOfDay(now).getTime()];
-    }
-    case "week":
-      return [startOfWeek(now, { weekStartsOn: 1 }).getTime(), now.getTime()];
-    case "month":
-      return [startOfMonth(now).getTime(), now.getTime()];
-  }
-}
 
 type DogDay = {
   dog: Dog;
@@ -49,7 +23,6 @@ type DayEntry = {
 };
 
 export default function History() {
-  const [range, setRange] = useState<RangeKey>("week");
   const { data: feedings = [], isLoading } = useFeedingsQuery();
   const { data: dogs = [] } = useDogsQuery();
 
@@ -58,30 +31,21 @@ export default function History() {
     [dogs]
   );
 
-  // 기간 내 급식 기록을 날짜별로 묶고, 각 날짜마다 활성 개체 전부의 섭취 여부를 집계.
-  const days: DayEntry[] = useMemo(() => {
-    const [from, to] = rangeBounds(range);
-    const inRange = feedings.filter((f) => {
-      const t = new Date(f.scheduled_at).getTime();
-      return t >= from && t <= to;
-    });
+  const todayKey = format(new Date(), "yyyy-MM-dd");
 
+  // 모든 급식 기록을 날짜별로 묶어 일지화 (최신 날짜 먼저).
+  // 오늘 카드는 기록이 0건이어도 항상 포함 — 실시간 현황판 역할.
+  const days: DayEntry[] = useMemo(() => {
     const byDay = new Map<string, FeedingRecord[]>();
-    for (const f of inRange) {
+    for (const f of feedings) {
       const key = format(new Date(f.scheduled_at), "yyyy-MM-dd");
       if (!byDay.has(key)) byDay.set(key, []);
       byDay.get(key)!.push(f);
     }
-
-    // 오늘이 선택 범위 안이면 기록이 0건이어도 오늘 카드를 보장 — 실시간 현황판 역할.
-    const tKey = format(new Date(), "yyyy-MM-dd");
-    const tMs = startOfDay(new Date()).getTime();
-    if (tMs >= from && tMs <= to && !byDay.has(tKey)) {
-      byDay.set(tKey, []);
-    }
+    if (!byDay.has(todayKey)) byDay.set(todayKey, []);
 
     return [...byDay.entries()]
-      .sort((a, b) => (a[0] < b[0] ? 1 : -1)) // 최신 날짜 먼저
+      .sort((a, b) => (a[0] < b[0] ? 1 : -1))
       .map(([dayKey, recs]) => {
         const perDog: DogDay[] = activeDogs
           .map((dog) => {
@@ -103,37 +67,15 @@ export default function History() {
           perDog,
         };
       });
-  }, [feedings, activeDogs, range]);
-
-  const todayKey = format(new Date(), "yyyy-MM-dd");
+  }, [feedings, activeDogs, todayKey]);
 
   return (
     <>
-      <PageHeader title="급식 일지" subtitle="오늘 현황 + 날짜별 급식 기록" />
-
-      <div className="mb-4 flex gap-2">
-        {RANGES.map((r) => (
-          <button
-            key={r.key}
-            onClick={() => setRange(r.key)}
-            className={`rounded-lg border px-3 py-1.5 text-[12px] font-semibold transition ${
-              range === r.key
-                ? "border-brand-dark bg-brand/15 text-brand-dark"
-                : "border-ink-strong bg-white text-ink-body hover:bg-surface"
-            }`}
-          >
-            {r.label}
-          </button>
-        ))}
-      </div>
+      <PageHeader title="급식 일지" subtitle="날짜별 개체 급식 기록" />
 
       {isLoading ? (
         <div className="flex items-center justify-center py-10 text-ink-faint">
           <Loader2 className="mr-2 animate-spin" size={16} /> 로딩 중…
-        </div>
-      ) : days.length === 0 ? (
-        <div className="card p-5 py-10 text-center text-[12px] text-ink-mute">
-          해당 기간의 급식 기록이 없습니다.
         </div>
       ) : (
         <div className="space-y-5">
@@ -142,7 +84,7 @@ export default function History() {
               <div className="mb-3 flex items-center justify-between border-b border-ink-line pb-3">
                 <div className="flex items-center gap-2 text-[14px] font-bold text-ink-body">
                   <span className="h-2 w-2 rounded-full bg-brand-dark" />
-                  {format(day.date, "M월 d일 (EEE)", { locale: ko })}
+                  {format(day.date, "yyyy년 M월 d일 (EEE)", { locale: ko })}
                   {day.dayKey === todayKey && (
                     <span className="pill bg-brand-dark text-white">오늘</span>
                   )}
@@ -159,46 +101,52 @@ export default function History() {
               </div>
 
               <div className="space-y-1.5">
-                {day.perDog.map((p) => (
-                  <div
-                    key={p.dog.id}
-                    className="flex items-center gap-3 rounded-lg bg-surface px-3 py-2.5"
-                  >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-avatar text-[14px]">
-                      🐶
-                    </div>
-                    <div className="w-32 shrink-0">
-                      <div className="text-[12px] font-bold text-ink-body">
-                        {p.dog.name}
-                      </div>
-                      <div className="truncate text-[10px] text-ink-faint">
-                        {p.dog.breed_name_ko}
-                      </div>
-                    </div>
-                    <span
-                      className={`pill shrink-0 ${
-                        p.ate
-                          ? "bg-brand/20 text-brand-dark"
-                          : "bg-accent-danger/15 text-accent-danger"
-                      }`}
-                    >
-                      {p.ate ? "먹음" : "안먹음"}
-                    </span>
-                    <div className="flex-1 text-right text-[11px] text-ink-mute">
-                      {p.count === 0 ? (
-                        <span className="text-ink-faint">급식 기록 없음</span>
-                      ) : (
-                        <>
-                          섭취 <b className="text-ink-body">{p.consumed}g</b>
-                          {` / 배급 ${p.dispensed}g`}
-                          {p.count > 1 && (
-                            <span className="text-ink-faint"> · {p.count}회</span>
-                          )}
-                        </>
-                      )}
-                    </div>
+                {day.perDog.length === 0 ? (
+                  <div className="py-4 text-center text-[12px] text-ink-mute">
+                    등록된 개체가 없습니다.
                   </div>
-                ))}
+                ) : (
+                  day.perDog.map((p) => (
+                    <div
+                      key={p.dog.id}
+                      className="flex items-center gap-3 rounded-lg bg-surface px-3 py-2.5"
+                    >
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-avatar text-[14px]">
+                        🐶
+                      </div>
+                      <div className="w-32 shrink-0">
+                        <div className="text-[12px] font-bold text-ink-body">
+                          {p.dog.name}
+                        </div>
+                        <div className="truncate text-[10px] text-ink-faint">
+                          {p.dog.breed_name_ko}
+                        </div>
+                      </div>
+                      <span
+                        className={`pill shrink-0 ${
+                          p.ate
+                            ? "bg-brand/20 text-brand-dark"
+                            : "bg-accent-danger/15 text-accent-danger"
+                        }`}
+                      >
+                        {p.ate ? "먹음" : "안먹음"}
+                      </span>
+                      <div className="flex-1 text-right text-[11px] text-ink-mute">
+                        {p.count === 0 ? (
+                          <span className="text-ink-faint">급식 기록 없음</span>
+                        ) : (
+                          <>
+                            섭취 <b className="text-ink-body">{p.consumed}g</b>
+                            {` / 배급 ${p.dispensed}g`}
+                            {p.count > 1 && (
+                              <span className="text-ink-faint"> · {p.count}회</span>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           ))}
