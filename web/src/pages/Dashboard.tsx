@@ -209,7 +209,7 @@ export default function Dashboard() {
           <table>
             <thead>
               <tr className="border-b border-ink-line">
-                {["개체", "품종", "체중", "권장량", "섭취량", "섭취율", "상태"].map((h) => (
+                {["개체", "품종", "체중", "권장량", "섭취량", "상태"].map((h) => (
                   <th
                     key={h}
                     className="px-3 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-ink-faint"
@@ -224,10 +224,6 @@ export default function Dashboard() {
                 const fr = feedings.find((f) => f.dog_id === d.id);
                 const consumed = fr?.consumed_g ?? 0;
                 const recommended = d.recommended_g ?? 60;
-                const pct = Math.min(
-                  100,
-                  Math.round((consumed / recommended) * 100)
-                );
                 const status = fr?.status ?? "pending";
                 return (
                   <tr
@@ -253,16 +249,6 @@ export default function Dashboard() {
                     </td>
                     <td className="px-3 py-3 text-[12px] text-ink-mute">
                       {consumed}g
-                    </td>
-                    <td className="px-3 py-3">
-                      <div className="h-1.5 w-[100px] overflow-hidden rounded-full bg-ink-line">
-                        <div
-                          className={`h-full rounded-full ${
-                            pct < 60 ? "bg-accent-warn" : "bg-brand"
-                          }`}
-                          style={{ width: `${pct}%` }}
-                        />
-                      </div>
                     </td>
                     <td className="px-3 py-3">
                       <StatusPill status={status} />
