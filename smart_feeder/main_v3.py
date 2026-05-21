@@ -37,6 +37,7 @@ from feeder_api import (
     fetch_dogs_with_embedding,
     insert_unregistered_access_alert,
     insert_feeding_blocked_alert,
+    insert_feeding_record,
     resolve_alert,
 )
 from audio import AudioPlayer
@@ -578,9 +579,13 @@ def infer_loop(yolo, reid, raw_slot, det_slot, counters, stop_event, feeding):
                     and (y2 - y1) >= MIN_BBOX_SIZE
                 ):
                     stable_id = reid.process_crop(tid, frame[y1:y2, x1:x2])
-                    # 급식 세션 중 미등록 개체 → 경고음 + alert (debounce 는 세션 내부).
-                    if stable_id == UNKNOWN_LABEL and feeding.is_active():
-                        feeding.on_unknown_detected(tid, WARNING_WAV)
+                    # 급식 세션 중: 미등록 개체 → 경고음 + alert + 시간 연장,
+                    #              등록 대상 개체 → 급식 완료 기록.
+                    if stable_id and feeding.is_active():
+                        if stable_id == UNKNOWN_LABEL:
+                            feeding.on_unknown_detected(tid, WARNING_WAV)
+                        else:
+                            feeding.on_dog_seen(stable_id)
 
         for tid in list(track_state.keys()):
             if tid not in seen_ids:
@@ -721,8 +726,18 @@ def main():
             daemon=True,
         ).start()
 
+    def _spawn_feeding_record(dog_id, dispensed_g):
+        # 섭취량은 무게 센서가 없어 배급량과 동일하게 가정 (개체가 왔으니 먹은 것으로).
+        threading.Thread(
+            target=insert_feeding_record,
+            args=(dog_id, dispensed_g, dispensed_g),
+            name=f"feeding-record-{dog_id[:8]}",
+            daemon=True,
+        ).start()
+
     feeding = FeedingSession(audio=audio,
-                             on_blocked=_spawn_feeding_blocked_alert)
+                             on_blocked=_spawn_feeding_blocked_alert,
+                             on_complete=_spawn_feeding_record)
 
     api_port = int(os.environ.get("FEEDER_API_PORT", "8765"))
     start_http_api(reid, feeding=feeding,

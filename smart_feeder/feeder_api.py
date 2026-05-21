@@ -142,6 +142,48 @@ def insert_feeding_blocked_alert(device_id, track_id):
     })
 
 
+def insert_feeding_record(dog_id, dispensed_g, consumed_g, confidence=None):
+    """급식 완료 기록 1건 insert — 급식 세션 대상 개체가 카메라에 확인됐을 때 호출.
+    device_id 는 FEEDER_SUPABASE_DEVICE_ID env (devices.id UUID).
+    미설정이면 스킵한다 (device_id FK 위배 방지).
+    """
+    url, key = _supabase_config()
+    if not url or not key:
+        print("[feeding] supabase not configured — skipping feeding record")
+        return False
+    device_id = os.environ.get("FEEDER_SUPABASE_DEVICE_ID", "").strip()
+    if not device_id:
+        print("[feeding] FEEDER_SUPABASE_DEVICE_ID 미설정 — feeding record 스킵")
+        return False
+    now = datetime.now(timezone.utc).isoformat()
+    payload = {
+        "dog_id": dog_id,
+        "device_id": device_id,
+        "scheduled_at": now,
+        "dispensed_at": now,
+        "dispensed_g": dispensed_g,
+        "consumed_g": consumed_g,
+        "status": "completed",
+    }
+    if confidence is not None:
+        payload["confidence"] = confidence
+    try:
+        resp = requests.post(
+            f"{url}/rest/v1/feeding_records",
+            headers=_supabase_headers(key),
+            json=payload,
+            timeout=10,
+        )
+    except requests.RequestException as e:
+        print(f"[feeding] record insert failed: {e}")
+        return False
+    if resp.status_code not in (200, 201):
+        print(f"[feeding] record insert error {resp.status_code}: {resp.text[:200]}")
+        return False
+    print(f"[feeding] record inserted: dog={dog_id} dispensed={dispensed_g}g")
+    return True
+
+
 def resolve_alert(alert_id):
     """alerts.resolved_at 을 지금 시각으로 PATCH. 호출 케이스:
     - 사용자가 UI 로 등록 성공 (commit_registration)
@@ -323,6 +365,7 @@ def create_app(reid, *, feeding=None, voice_wav_resolver=None):
         dog_id = body.get("dog_id")
         name = body.get("name") or ""
         duration_sec = body.get("duration_sec", 60)
+        dispensed_g = body.get("dispensed_g", 0)
         if not isinstance(dog_id, str) or not dog_id.strip():
             return jsonify({"ok": False, "error": "dog_id (string) required"}), 400
         if not isinstance(name, str):
@@ -333,10 +376,14 @@ def create_app(reid, *, feeding=None, voice_wav_resolver=None):
             return jsonify({"ok": False, "error": "duration_sec must be int"}), 400
         if duration_sec <= 0 or duration_sec > 600:
             return jsonify({"ok": False, "error": "duration_sec out of range (1..600)"}), 400
+        try:
+            dispensed_g = float(dispensed_g)
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "dispensed_g must be number"}), 400
 
         voice_path = voice_wav_resolver(dog_id.strip())
-        ok, err = feeding.start(dog_id.strip(), name.strip(),
-                                voice_path, duration_sec=duration_sec)
+        ok, err = feeding.start(dog_id.strip(), name.strip(), voice_path,
+                                duration_sec=duration_sec, dispensed_g=dispensed_g)
         if not ok:
             # 동시 시작 충돌은 409
             return jsonify({"ok": False, "error": err}), 409

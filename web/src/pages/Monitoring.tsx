@@ -74,6 +74,7 @@ function FeederCard({
         dog_id: dog.id,
         name: dog.name,
         duration_sec: 60,
+        dispensed_g: dog.recommended_g ?? 60,
       });
       setFeeding(status);
     } catch (e) {

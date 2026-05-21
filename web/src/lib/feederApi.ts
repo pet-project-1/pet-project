@@ -39,12 +39,14 @@ export interface FeedingStatus {
   ends_at: number;
   remaining_sec: number;
   blocked_count: number;
+  recorded: boolean; // 대상 개체가 카메라에 확인돼 급식 완료 기록됨
 }
 
 export interface FeedingStartPayload {
   dog_id: string;
   name?: string;
   duration_sec?: number;
+  dispensed_g?: number; // 배급량(g) — feeding_records 에 기록될 값
 }
 
 const FEEDERS: { deviceId?: string; apiUrl?: string }[] = [
