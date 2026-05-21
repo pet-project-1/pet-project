@@ -31,8 +31,15 @@ export default function Dashboard() {
   const { data: devices = [] } = useDevicesQuery();
 
   const stats = useMemo(() => {
-    const today = feedings; // 서버에서 이미 최신순 100건. 운영 시 날짜 필터.
-    const completed = today.filter((f) => f.status === "completed").length;
+    // 오늘(로컬 날짜) 급식 기록만 집계.
+    const todayKey = format(new Date(), "yyyy-MM-dd");
+    const today = feedings.filter(
+      (f) => format(new Date(f.scheduled_at), "yyyy-MM-dd") === todayKey
+    );
+    // 오늘 급식을 마친 개체 수 — 한 개체가 여러 번 배급돼도 1로 (중복 제거).
+    const fedDogs = new Set(
+      today.filter((f) => f.consumed_g > 0 && f.dog_id).map((f) => f.dog_id)
+    ).size;
     const blocked = today.filter((f) => f.status === "blocked").length;
     const incomplete = today.filter((f) => f.status === "incomplete").length;
     const dispensedRows = today.filter((f) => f.dispensed_g > 0);
@@ -51,7 +58,7 @@ export default function Dashboard() {
       .map((f) => f.dog_name)
       .slice(0, 3)
       .join(", ");
-    return { completed, blocked, incomplete, avgIntake, incompleteIds };
+    return { fedDogs, blocked, incomplete, avgIntake, incompleteIds };
   }, [feedings]);
 
   const now = new Date();
@@ -72,10 +79,13 @@ export default function Dashboard() {
         />
         <StatCard
           label="오늘 급식 완료"
-          value={stats.completed}
+          value={stats.fedDogs}
           sub={
             dogs.length
-              ? `${Math.round((stats.completed / dogs.length) * 100)}% 완료`
+              ? `전체 ${dogs.length}마리 중 ${Math.min(
+                  100,
+                  Math.round((stats.fedDogs / dogs.length) * 100)
+                )}%`
               : "—"
           }
         />
