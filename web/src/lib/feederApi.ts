@@ -63,7 +63,13 @@ const FEEDERS: { deviceId?: string; apiUrl?: string }[] = [
 const TOKEN = import.meta.env.VITE_FEEDER_API_TOKEN;
 
 function authHeaders(): Record<string, string> {
-  return TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {};
+  // ngrok 무료 티어는 브라우저 UA 요청에 경고 인터스티셜(ERR_NGROK_6024)을 반환하는데,
+  // 그 HTML 페이지에는 Access-Control-Allow-Origin 헤더가 없어 교차출처 fetch 가
+  // "Failed to fetch" 로 차단된다. 이 헤더를 보내면 ngrok 이 경고를 건너뛰고
+  // Flask(feeder_api.py) 로 그대로 포워딩 → 정상 JSON + CORS 응답을 받는다.
+  const headers: Record<string, string> = { "ngrok-skip-browser-warning": "true" };
+  if (TOKEN) headers.Authorization = `Bearer ${TOKEN}`;
+  return headers;
 }
 
 export function deviceIdToApiUrl(deviceId: string | null | undefined): string | undefined {
