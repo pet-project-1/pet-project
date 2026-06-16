@@ -4,8 +4,13 @@ import { Loader2, Play } from "lucide-react";
 import PageHeader, { LiveBadge } from "@/components/PageHeader";
 import CameraBox from "@/components/CameraBox";
 import StatusPill from "@/components/StatusPill";
-import { useAlertsQuery, useDogsQuery, useFeedingsQuery } from "@/hooks/queries";
-import { addLocalFeeding, useLocalFeedings } from "@/hooks/useLocalFeedings";
+import {
+  useAlertsQuery,
+  useDevicesQuery,
+  useDogsQuery,
+  useFeedingsQuery,
+} from "@/hooks/queries";
+import { completeFeedingRecord, createFeedingRecord } from "@/lib/api";
 import {
   deviceIdToApiUrl,
   getFeedingStatus,
@@ -27,6 +32,7 @@ function FeederCard({
   const apiUrl = deviceIdToApiUrl(deviceId);
   const { data: dogs = [] } = useDogsQuery();
   const { data: alerts = [] } = useAlertsQuery();
+  const { data: devices = [] } = useDevicesQuery();
 
   const [selectedDogId, setSelectedDogId] = useState<string>("");
   const [feeding, setFeeding] = useState<FeedingStatus | null>(null);
@@ -65,35 +71,65 @@ function FeederCard({
   }, [feeding, now]);
 
   const onStart = async () => {
-    if (!selectedDogId || !apiUrl) return;
+    if (!selectedDogId) return;
     const dog = dogs.find((d) => d.id === selectedDogId);
     if (!dog) return;
+    const device =
+      devices.find((d) => d.name === `급식기 ${index}번`) ?? devices[0];
+    if (!device) {
+      setError("급식기 정보를 불러오지 못했습니다.");
+      return;
+    }
     const duration = 30;
     const dispensed = dog.recommended_g ?? 60;
-    // 실행 시점에 로컬 급식 로그에 즉시 추가 — 모니터링 로그/급식 일지가 공유.
-    // duration 경과 시 자동으로 '먹음(completed)' 으로 전환된다.
-    addLocalFeeding({
-      dog_id: dog.id,
-      dog_name: dog.name,
-      breed_name_ko: dog.breed_name_ko,
-      device_name: `급식기 ${index}번`,
-      dispensed_g: dispensed,
-      duration_sec: duration,
-    });
+
     setStarting(true);
     setError(null);
+
+    // 1) Supabase 에 급식 기록 저장(pending) — realtime 으로 대시보드/이력 자동 반영.
+    let recordId: string;
     try {
-      const status = await startFeeding(apiUrl, {
+      recordId = await createFeedingRecord({
+        dog_id: dog.id,
+        device_id: device.id,
+        dispensed_g: dispensed,
+      });
+    } catch (e) {
+      setError((e as Error).message);
+      setStarting(false);
+      return;
+    }
+
+    // 2) 카드 카운트다운(로컬) — 파이 없이도 진행 표시.
+    const startedAt = Date.now() / 1000;
+    setFeeding({
+      dog_id: dog.id,
+      name: dog.name,
+      started_at: startedAt,
+      ends_at: startedAt + duration,
+      remaining_sec: duration,
+      blocked_count: 0,
+      recorded: false,
+    });
+    setStarting(false);
+
+    // 3) duration 경과 시 완료(먹음)로 전환 — consumed_g = 배급량.
+    window.setTimeout(() => {
+      completeFeedingRecord(recordId, dispensed).catch(() => {
+        /* 완료 PATCH 실패 — 기록은 pending 으로 남음. 무시. */
+      });
+    }, duration * 1000);
+
+    // 4) 물리 급식 — 파이가 살아있으면 실제 배출/카메라. 실패해도 기록엔 영향 없음.
+    if (apiUrl) {
+      startFeeding(apiUrl, {
         dog_id: dog.id,
         name: dog.name,
         duration_sec: duration,
         dispensed_g: dispensed,
+      }).catch(() => {
+        /* 파이 unreachable — 기록은 이미 Supabase 에 저장됨. 무시. */
       });
-      setFeeding(status);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setStarting(false);
     }
   };
 
@@ -167,7 +203,7 @@ function FeederCard({
         <button
           type="button"
           className="btn-primary"
-          disabled={!selectedDogId || !apiUrl || starting || !!feeding}
+          disabled={!selectedDogId || starting || !!feeding}
           onClick={onStart}
         >
           <Play size={14} />
@@ -190,16 +226,7 @@ function FeederCard({
 }
 
 export default function Monitoring() {
-  const { data: dbFeedings = [], isLoading } = useFeedingsQuery();
-  const localFeedings = useLocalFeedings();
-  // 로컬(방금 실행한) 급식 + DB 급식을 합쳐 최신순으로 표시.
-  const feedings = useMemo(
-    () =>
-      [...localFeedings, ...dbFeedings].sort((a, b) =>
-        a.scheduled_at < b.scheduled_at ? 1 : -1
-      ),
-    [localFeedings, dbFeedings]
-  );
+  const { data: feedings = [], isLoading } = useFeedingsQuery();
 
   return (
     <>

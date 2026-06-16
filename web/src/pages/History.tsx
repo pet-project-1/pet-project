@@ -4,7 +4,6 @@ import { ko } from "date-fns/locale";
 import { Loader2 } from "lucide-react";
 import PageHeader from "@/components/PageHeader";
 import { useDogsQuery, useFeedingsQuery } from "@/hooks/queries";
-import { useLocalFeedings } from "@/hooks/useLocalFeedings";
 import type { Dog, FeedingRecord } from "@/types";
 
 type DogDay = {
@@ -24,15 +23,8 @@ type DayEntry = {
 };
 
 export default function History() {
-  const { data: dbFeedings = [], isLoading } = useFeedingsQuery();
-  const localFeedings = useLocalFeedings();
+  const { data: feedings = [], isLoading } = useFeedingsQuery();
   const { data: dogs = [] } = useDogsQuery();
-
-  // 로컬(실행한) 급식 + DB 급식 병합 — 종료된 로컬 급식은 consumed_g>0 이라 '먹음' 처리.
-  const feedings = useMemo(
-    () => [...localFeedings, ...dbFeedings],
-    [localFeedings, dbFeedings]
-  );
 
   // 날짜 범위 필터 (yyyy-MM-dd 문자열, 빈 값이면 무제한).
   const [from, setFrom] = useState("");

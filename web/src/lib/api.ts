@@ -63,6 +63,46 @@ export async function fetchFeedings(limit = 1000): Promise<FeedingRecord[]> {
   }));
 }
 
+// 급식 시작 — feeding_records 에 pending 기록 1건 insert (RLS: admin/manager).
+// 파이 없이 웹에서 직접 저장. realtime 구독이 대시보드/이력을 자동 갱신.
+export async function createFeedingRecord(input: {
+  dog_id: string;
+  device_id: string;
+  dispensed_g: number;
+}): Promise<string> {
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("feeding_records")
+    .insert({
+      dog_id: input.dog_id,
+      device_id: input.device_id,
+      scheduled_at: now,
+      dispensed_g: input.dispensed_g,
+      consumed_g: 0,
+      status: "pending",
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return (data as { id: string }).id;
+}
+
+// 급식 종료 — 해당 기록을 완료(먹음)로 전환. consumed_g 는 배급량과 동일 가정.
+export async function completeFeedingRecord(
+  id: string,
+  consumed_g: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from("feeding_records")
+    .update({
+      status: "completed",
+      consumed_g,
+      dispensed_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (error) throw error;
+}
+
 export async function fetchAlerts(): Promise<AppAlert[]> {
   const { data, error } = await supabase
     .from("alerts")
