@@ -68,7 +68,7 @@ function FeederCard({
     if (!selectedDogId || !apiUrl) return;
     const dog = dogs.find((d) => d.id === selectedDogId);
     if (!dog) return;
-    const duration = 15;
+    const duration = 30;
     const dispensed = dog.recommended_g ?? 60;
     // 실행 시점에 로컬 급식 로그에 즉시 추가 — 모니터링 로그/급식 일지가 공유.
     // duration 경과 시 자동으로 '먹음(completed)' 으로 전환된다.
