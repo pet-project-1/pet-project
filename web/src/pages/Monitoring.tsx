@@ -5,6 +5,7 @@ import PageHeader, { LiveBadge } from "@/components/PageHeader";
 import CameraBox from "@/components/CameraBox";
 import StatusPill from "@/components/StatusPill";
 import { useAlertsQuery, useDogsQuery, useFeedingsQuery } from "@/hooks/queries";
+import { addLocalFeeding, useLocalFeedings } from "@/hooks/useLocalFeedings";
 import {
   deviceIdToApiUrl,
   getFeedingStatus,
@@ -67,14 +68,26 @@ function FeederCard({
     if (!selectedDogId || !apiUrl) return;
     const dog = dogs.find((d) => d.id === selectedDogId);
     if (!dog) return;
+    const duration = 15;
+    const dispensed = dog.recommended_g ?? 60;
+    // 실행 시점에 로컬 급식 로그에 즉시 추가 — 모니터링 로그/급식 일지가 공유.
+    // duration 경과 시 자동으로 '먹음(completed)' 으로 전환된다.
+    addLocalFeeding({
+      dog_id: dog.id,
+      dog_name: dog.name,
+      breed_name_ko: dog.breed_name_ko,
+      device_name: `급식기 ${index}번`,
+      dispensed_g: dispensed,
+      duration_sec: duration,
+    });
     setStarting(true);
     setError(null);
     try {
       const status = await startFeeding(apiUrl, {
         dog_id: dog.id,
         name: dog.name,
-        duration_sec: 60,
-        dispensed_g: dog.recommended_g ?? 60,
+        duration_sec: duration,
+        dispensed_g: dispensed,
       });
       setFeeding(status);
     } catch (e) {
@@ -177,7 +190,16 @@ function FeederCard({
 }
 
 export default function Monitoring() {
-  const { data: feedings = [], isLoading } = useFeedingsQuery();
+  const { data: dbFeedings = [], isLoading } = useFeedingsQuery();
+  const localFeedings = useLocalFeedings();
+  // 로컬(방금 실행한) 급식 + DB 급식을 합쳐 최신순으로 표시.
+  const feedings = useMemo(
+    () =>
+      [...localFeedings, ...dbFeedings].sort((a, b) =>
+        a.scheduled_at < b.scheduled_at ? 1 : -1
+      ),
+    [localFeedings, dbFeedings]
+  );
 
   return (
     <>
