@@ -265,7 +265,11 @@ def create_app(reid, *, feeding=None, voice_wav_resolver=None):
     def _cors(resp):
         resp.headers["Access-Control-Allow-Origin"] = "*"
         resp.headers["Access-Control-Allow-Methods"] = "GET, POST, DELETE, OPTIONS"
-        resp.headers["Access-Control-Allow-Headers"] = "Authorization, Content-Type"
+        # ngrok-skip-browser-warning: 웹이 ngrok 무료티어 경고 페이지를 우회하려고 보내는
+        # 커스텀 헤더. 허용 목록에 없으면 브라우저 CORS preflight 가 실패해 "Failed to fetch".
+        resp.headers["Access-Control-Allow-Headers"] = (
+            "Authorization, Content-Type, ngrok-skip-browser-warning"
+        )
         return resp
 
     @app.post("/register")
