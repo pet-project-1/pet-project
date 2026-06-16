@@ -387,7 +387,11 @@ def create_app(reid, *, feeding=None, voice_wav_resolver=None):
         if not ok:
             # 동시 시작 충돌은 409
             return jsonify({"ok": False, "error": err}), 409
-        return jsonify({"ok": True, "status": feeding.status()}), 201
+        # 버튼 눌러 세션 시작이 성공하면 카메라 확인을 기다리지 않고 바로 급식 기록 저장.
+        # consumed_g 는 배급량과 동일하게 가정 (무게센서 없음). 저장 실패해도 세션은 진행.
+        record_saved = insert_feeding_record(dog_id.strip(), dispensed_g, dispensed_g)
+        return jsonify({"ok": True, "status": feeding.status(),
+                        "record_saved": record_saved}), 201
 
     @app.get("/feeding/status")
     def feeding_status():
